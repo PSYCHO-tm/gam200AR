@@ -1,0 +1,32 @@
+{  
+  "SCENARIO":{
+    "Tutorial":{
+      "Key"   : 0,
+      "Time"  : 0,
+      "Units" : "sec",
+
+      "Visual": {},
+      "Audio" : {}
+
+    },
+
+    "Normal":{
+      "Key"   : 1,
+      "Time"  : 270,
+      "Units" : "sec",
+
+      "Visual": {},
+      "Audio" : {}
+    },
+
+    "Rushhour":{
+      "Key" : 2,
+      "Time"  : 320,
+      "Units" : "sec",
+ 
+      "Visual": {},
+      "Audio" : {}
+    }
+
+  }
+}	

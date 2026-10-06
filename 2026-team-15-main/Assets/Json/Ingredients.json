@@ -1,0 +1,51 @@
+
+{
+    "INGREDIENTS": {
+        "coffee_beans": {
+            "Name": "Coffee Beans",
+            "Units": "g",
+            "Visual": {},
+            "Audio": {},
+            "State": ["whole", "ground"]
+        },
+
+        "water": {
+            "Name": "Water",
+            "Units": "g",
+            "Visual": {},
+            "Audio": {},
+	          "State": ["cold", "hot"]
+        },
+
+        "evaporated_milk": {
+            "Name": "Evaporated Milk",
+            "Units": "tablespoon(s)",
+            "Visual": {},
+            "Audio": {},
+            "Sweetened": ["Yes", "No"]
+        },
+        
+	      "condensed_milk":{
+            "Name": "Condensed Milk",
+            "Units": "tablespoon(s)",
+            "Visual": {},
+            "Audio": {},
+            "Sweetened": ["Yes", "No"]
+	      },
+
+	      "sugar":{
+            "Name": "Sugar",
+            "Units": "teaspoons",
+            "Visual": {},
+            "Audio": {},
+            "State": ["sealed", "poured"]
+	      },
+        
+        "ice":{
+            "Name": "Ice",
+            "Units": "g",
+            "Visual": {},
+            "Audio": {}
+        }
+    }
+}

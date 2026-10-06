@@ -1,0 +1,54 @@
+{  
+  "DRINKS":{
+    "Kopi"      : {
+        "Name"    : "Kopi",
+        "Recipe"  : "Kopi_recipe",
+        "Status"  : "Hot",
+
+        "Visual"  : {},
+        "Audio"   : {}
+    },
+
+    "Kopi O"    :  {
+        "Name"    : "Kopi_O",
+        "Recipe"  : "Kopi_O_recipe",
+        "Status"  : "Hot",
+
+        "Visual"  : {},
+        "Audio"   : {}
+    },
+
+    "Kopi C" :  {
+        "Name"    : "Kopi_C",
+        "Recipe"  : "Kopi_C_recipe",
+        "Status"  : "Hot",
+
+        "Visual"  : {},
+        "Audio"   : {}
+    },
+
+    "Kopi Gau" :  {
+        "Name"    : "Kopi_Gau",
+        "Recipe"  : "Kopi_Gau_recipe",
+        "Status"  : "Hot",
+
+        "Visual"  : {},
+        "Audio"   : {}
+    },
+
+
+    "Kopi Peng" :  {
+        "Name"    : "Kopi_Peng",
+        "Recipe"  : "Kopi_Peng_recipe",
+        "Status"  : "Iced",
+
+        "Visual"  : {},
+        "Audio"   : {}
+    }
+
+
+
+    
+  }
+  
+}	

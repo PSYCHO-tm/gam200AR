@@ -1,0 +1,213 @@
+---
+# .clang-tidy — LLVM 18.1.3 | C++20 | CMake project
+#
+# ═══════════════════════════════════════════════════════════
+#
+#   Single line:  // NOLINT(check-name)       — this line only
+#   Next line:    // NOLINTNEXTLINE(check-name)
+#   Block:        // NOLINTBEGIN(check-name)
+#                 ...
+#                 // NOLINTEND(check-name)
+#
+#   Always name the specific check. Always add a comment explaining why.
+#   Never use bare // NOLINT without a check name.
+# ═══════════════════════════════════════════════════════════
+
+Checks: >-
+  *,
+
+  -abseil-*,
+  -altera-*,
+  -android-*,
+  -boost-*,
+  -darwin-*,
+  -fuchsia-*,
+  -google-*,
+  -linuxkernel-*,
+  -llvm-*,
+  -llvmlibc-*,
+  -mpi-*,
+  -objc-*,
+  -zircon-*,
+
+  -clang-diagnostic-unknown-warning-option,
+
+  -modernize-use-trailing-return-type,
+  -readability-else-after-return,
+  -readability-static-accessed-through-instance,
+  -readability-avoid-const-params-in-decls,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-uppercase-literal-suffix,
+
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-owning-memory,
+
+  -misc-non-private-member-variables-in-classes,
+  -misc-include-cleaner,
+
+  -clang-analyzer-security.insecureAPI.rand,
+
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+
+  -hicpp-avoid-c-arrays,
+  -hicpp-braces-around-statements,
+  -hicpp-member-init,
+  -hicpp-move-const-arg,
+  -hicpp-new-delete-operators,
+  -hicpp-no-array-decay,
+  -hicpp-no-malloc,
+  -hicpp-special-member-functions,
+  -hicpp-use-auto,
+  -hicpp-use-emplace,
+  -hicpp-use-equals-default,
+  -hicpp-use-equals-delete,
+  -hicpp-use-noexcept,
+  -hicpp-use-nullptr,
+  -hicpp-use-override,
+  -hicpp-uppercase-literal-suffix,
+  -hicpp-vararg,
+
+  -cert-dcl03-c,
+  -cert-dcl16-c,
+  -cert-dcl37-c,
+  -cert-dcl51-cpp,
+  -cert-err09-cpp,
+  -cert-err61-cpp,
+  -cert-fio38-c,
+  -cert-oop11-cpp,
+  -cert-oop54-cpp,
+  -cert-pos44-c
+
+# Analyze project headers only; exclude the CMake build directory.
+# Override per-run: --header-filter='<pattern>'
+HeaderFilterRegex: '^(?!.*/build/).+'
+
+# Uses the project .clang-format file for formatting fix suggestions.
+FormatStyle: file
+
+CheckOptions:
+
+  # ── Namespaces ────────────────────────────────────────────────────────────
+  - key: readability-identifier-naming.NamespaceCase
+    value: CamelCase
+
+  # ── Classes ───────────────────────────────────────────────────────────────
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.AbstractClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.AbstractClassPrefix
+    value: I
+
+  # ── Structs ───────────────────────────────────────────────────────────────
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructIgnoredRegexp
+    value: '^(bool|float|int|uint)[2-4]$'
+
+  # ── Enums ─────────────────────────────────────────────────────────────────
+  - key: readability-identifier-naming.EnumCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.EnumConstantIgnoredRegexp
+    value: '^CS180.*'
+  - key: readability-identifier-naming.ScopedEnumConstantCase
+    value: UPPER_CASE
+
+  # ── Unions ────────────────────────────────────────────────────────────────
+  - key: readability-identifier-naming.UnionCase
+    value: CamelCase
+
+  # ── Type Aliases ──────────────────────────────────────────────────────────
+  # TypedefIgnoredRegexp lets project-prefixed C typedefs use an all-caps
+  # acronym prefix (CS180Foo) instead of failing strict CamelCase (Cs180Foo).
+  - key: readability-identifier-naming.TypedefCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeAliasIgnoredRegexp
+    value: '^(bool|float|int|uint)[2-4]$'
+
+  # ── Template Parameters ───────────────────────────────────────────────────
+  # CamelCase covers both single-letter T and descriptive names like Key, Value.
+  - key: readability-identifier-naming.TypeTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.ValueTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.TemplateTemplateParameterCase
+    value: CamelCase
+
+  # ── Free Functions ────────────────────────────────────────────────────────
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+
+  # ── Methods ───────────────────────────────────────────────────────────────
+  # MethodCase is the default for all access levels.
+  # PrivateMethodCase overrides it for private methods.
+  - key: readability-identifier-naming.MethodCase
+    value: CamelCase
+  - key: readability-identifier-naming.PrivateMethodCase
+    value: CamelCase
+
+  # ── Local Variables & Parameters ──────────────────────────────────────────
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.LocalVariableCase
+    value: camelBack
+  - key: readability-identifier-naming.ParameterCase
+    value: camelBack
+
+  # ── Member Variables ──────────────────────────────────────────────────────
+  # MemberCase is the default; PublicMemberCase overrides it for public fields.
+  - key: readability-identifier-naming.MemberCase
+    value: CamelCase
+  - key: readability-identifier-naming.PublicMemberCase
+    value: CamelCase
+  - key: readability-identifier-naming.PublicMemberIgnoredRegexp
+    value: '^[xyzwrgbastuv]$'
+
+  # ── Global Variables (mutable): gPascalCase ───────────────────────────────
+  # Prefix 'g' is stripped before case check: gFunTimes → FunTimes (CamelCase ✓)
+  - key: readability-identifier-naming.GlobalVariableCase
+    value: camelBack
+  - key: readability-identifier-naming.GlobalVariablePrefix
+    value: g
+
+  # ── Constants ─────────────────────────────────────────────────────────────
+  # Global / static / member constants: PascalCase, no prefix.
+  # Local const variables: snake_case (follow the local variable convention).
+  #- key: readability-identifier-naming.ConstantCase
+  #  value: CamelCase
+  #- key: readability-identifier-naming.ConstantMemberCase
+  #  value: CamelCase
+  #- key: readability-identifier-naming.GlobalConstantCase
+  #  value: CamelCase
+  #- key: readability-identifier-naming.StaticConstantCase
+  #  value: CamelCase
+  #- key: readability-identifier-naming.ConstexprVariableCase
+  #  value: CamelCase
+  #- key: readability-identifier-naming.LocalConstantCase
+  #  value: lower_case
+  #- key: readability-identifier-naming.LocalConstexprVariableCase
+  #  value: lower_case
+
+  # ── Macros ────────────────────────────────────────────────────────────────
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+
+  # ── Check Tuning ──────────────────────────────────────────────────────────
+  # Classes with only a defaulted destructor don't require the full Rule of Five.
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: 'true'
+  # Only suggest `auto` when the replaced type name is 5+ characters long.
+  - key: modernize-use-auto.MinTypeNameLength
+    value: '1'
+  # Allow complex-but-legitimate algorithms (e.g. intersection tests, decompositions).
+  # Default is 25; 50 avoids noise on dense-but-correct math functions.
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '50'

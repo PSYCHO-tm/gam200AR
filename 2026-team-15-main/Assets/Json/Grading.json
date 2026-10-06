@@ -1,0 +1,12 @@
+{  
+  "GRADING":{
+    "Grade": [
+      { "Grade" : "A", "Score" : 90 },
+      { "Grade" : "B", "Score" : 75 },
+      { "Grade" : "C", "Score" : 60 },
+      { "Grade" : "D", "Score" : 40 },
+      { "Grade" : "F", "Score" : 0 }
+    ]
+  }
+  
+}	

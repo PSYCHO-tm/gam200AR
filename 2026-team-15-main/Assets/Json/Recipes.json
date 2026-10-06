@@ -1,0 +1,81 @@
+{  
+  "RECIPES":{
+    "Kopi_recipe"      : {
+      "Ingredients":{
+        
+        "coffee_beans"      : { "Amount" : 18,  "State"  : "ground"},
+
+        "condensed_milk"    : { "Amount" : 2,  "Sweetened"  : "Yes"},
+        
+        "water"             : { "Amount" : 220, "State"  : "hot"},
+
+        "Visual"  : {},
+        "Audio"   : {}
+      }
+    },
+
+    "Kopi_O_recipe"    :  {
+
+        "coffee_beans"      : { "Amount" : 20,  "State"  : "ground"},
+        
+        "water"             : { "Amount" : 200, "State"  : "hot"   },
+
+        "sugar"             : { "Amount" : 2                       },
+
+        "Visual"  : {},
+        "Audio"   : {}
+    },
+
+
+
+    "Kopi_C_recipe" :  {
+        
+        "coffee_beans"      : { "Amount" : 18,  "State"  : "ground"},
+        
+        "evaporated_milk"   : { "Amount" : 2,  "Sweetened"  : "No" },
+
+        "water"             : { "Amount" : 200, "State"  : "hot"   },
+
+        "sugar"             : { "Amount" : 1                       },
+
+        "Visual"  : {},
+        "Audio"   : {}
+    },
+
+    "Kopi_Gau_recipe" :  {
+  
+        "coffee_beans"      : { "Amount" : 30,  "State"  : "ground"},
+        
+        "condensed_milk"    : { "Amount" : 1,  "Sweetened"  : "Yes"},
+
+        "evaporated_milk"   : { "Amount" : 1,  "Sweetened"  : "No" },
+
+        "water"             : { "Amount" : 150, "State"  : "hot"   },
+
+        "Visual"  : {},
+        "Audio"   : {}
+    },
+
+
+    "Kopi_Peng_recipe" :  {
+
+        "coffee_beans"      : { "Amount" : 25,  "State"  : "ground"},
+        
+        "condensed_milk"    : { "Amount" : 2,  "Sweetened"  : "No" },
+
+        "evaporated_milk"   : { "Amount" : 1,  "Sweetened"  : "No" },
+
+        "water"             : { "Amount" : 150, "State"  : "hot"   },
+
+        "ice"               : { "Amount" : 8                       },
+
+        "Visual"  : {},
+        "Audio"   : {}
+    }
+
+
+
+    
+  }
+  
+}	

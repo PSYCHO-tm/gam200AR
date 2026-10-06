@@ -1,0 +1,69 @@
+# --- C++ / CMake ---
+build/
+build-*/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.lib
+*.exe
+*.pdb
+*.ilk
+*.exp
+
+# --- IDE / editors ---
+.vs/
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+*.sln.docstates
+
+# --- Web dev ---
+node_modules/
+dist/
+.cache/
+.parcel-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.env
+.env.local
+.env.*.local
+
+# --- Android ---
+*.apk
+*.aab
+*.ap_
+*.dex
+.gradle/
+local.properties
+captures/
+.cxx/
+.externalNativeBuild/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db
+desktop.ini
