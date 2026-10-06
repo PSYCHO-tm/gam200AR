@@ -1,0 +1,2 @@
+# The project .gitignore ignores *.obj (build artifacts). These placeholder meshes are source assets, so track them.
+!*.obj

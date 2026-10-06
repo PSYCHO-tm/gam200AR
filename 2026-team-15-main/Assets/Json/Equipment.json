@@ -1,0 +1,34 @@
+{
+  "EQUIPMENT":{
+    "Kettle":{
+      "Mesh"         : "Assets/Models/kettle.obj",
+      "Position"     : [-0.27, 0.0, 0.0],
+      "Scale"        : 1.0,
+      "Color"        : [0.70, 0.72, 0.78],
+      "Interactions" : [
+        { "Action" : "pour_water", "Button" : "pour", "Quantity" : 220, "Unit" : "ml" }
+      ]
+    },
+
+    "SockFilter":{
+      "Mesh"         : "Assets/Models/sock_filter.obj",
+      "Position"     : [0.0, 0.0, 0.0],
+      "Scale"        : 1.0,
+      "Color"        : [0.55, 0.38, 0.22],
+      "Interactions" : [
+        { "Action" : "add_grounds", "Button" : "add",   "Quantity" : 18, "Unit" : "g"   },
+        { "Action" : "serve",       "Button" : "serve", "Quantity" : 1,  "Unit" : "cup" }
+      ]
+    },
+
+    "CondensedMilkTin":{
+      "Mesh"         : "Assets/Models/condensed_milk_tin.obj",
+      "Position"     : [0.20, 0.0, 0.02],
+      "Scale"        : 1.0,
+      "Color"        : [0.92, 0.88, 0.70],
+      "Interactions" : [
+        { "Action" : "pour_condensed_milk", "Button" : "pour", "Quantity" : 2, "Unit" : "tbsp" }
+      ]
+    }
+  }
+}
