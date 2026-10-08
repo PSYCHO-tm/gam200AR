@@ -1,8 +1,0 @@
-{
-  "bindings": {
-    "pour_water": "PourWater",
-    "add_grounds": "AddGrounds",
-    "pour_condensed_milk": "PourCondensedMilk",
-    "serve": "Serve"
-  }
-}
