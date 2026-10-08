@@ -1,0 +1,8 @@
+{
+  "type": "sockFilter",
+  "components": {
+    "Transform": { "position": [0.15, 0.0, 0.0] },
+    "MeshRef": { "path": "Models/sock_filter.obj" },
+    "Material": { "color": [0.8, 0.7, 0.55] }
+  }
+}

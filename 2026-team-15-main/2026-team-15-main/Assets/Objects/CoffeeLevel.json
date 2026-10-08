@@ -1,0 +1,27 @@
+{
+  "type": "coffeeLevel",
+  "components": {
+    "Transform": {
+      "position": [
+        0.15,
+        0.0405,
+        0.12
+      ],
+      "scale": [
+        0.06,
+        0.001,
+        0.06
+      ]
+    },
+    "MeshRef": {
+      "path": "Models/unitCube.obj"
+    },
+    "Material": {
+      "color": [
+        0.25,
+        0.14,
+        0.07
+      ]
+    }
+  }
+}

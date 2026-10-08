@@ -1,0 +1,8 @@
+{
+  "type": "table",
+  "components": {
+    "Transform": { "position": [0.0, -0.01, 0.0], "scale": [0.6, 0.02, 0.4] },
+    "MeshRef": { "path": "Models/unitCube.obj" },
+    "Material": { "color": [0.45, 0.32, 0.2] }
+  }
+}

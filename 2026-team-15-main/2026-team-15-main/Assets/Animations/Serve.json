@@ -1,0 +1,84 @@
+{
+  "name": "Serve",
+  "duration": 2.5,
+  "tracks": [
+    {
+      "target": "coffeeLevel",
+      "property": "scale",
+      "keys": [
+        {
+          "t": 0,
+          "value": [
+            0.06,
+            0.001,
+            0.06
+          ]
+        },
+        {
+          "t": 0.2,
+          "value": [
+            0.06,
+            0.001,
+            0.06
+          ]
+        },
+        {
+          "t": 1.8,
+          "value": [
+            0.06,
+            0.02,
+            0.06
+          ]
+        },
+        {
+          "t": 2.5,
+          "value": [
+            0.06,
+            0.02,
+            0.06
+          ]
+        }
+      ],
+      "ease": "linear"
+    },
+    {
+      "target": "coffeeLevel",
+      "property": "position",
+      "keys": [
+        {
+          "t": 0,
+          "value": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "t": 0.2,
+          "value": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "t": 1.8,
+          "value": [
+            0,
+            0.0095,
+            0
+          ]
+        },
+        {
+          "t": 2.5,
+          "value": [
+            0,
+            0.0095,
+            0
+          ]
+        }
+      ],
+      "ease": "linear"
+    }
+  ]
+}
