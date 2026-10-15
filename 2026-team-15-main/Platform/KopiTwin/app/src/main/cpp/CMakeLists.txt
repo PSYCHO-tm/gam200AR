@@ -29,8 +29,8 @@ set(CORE_DIR ${REPO_ROOT}/Core)
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        native-lib.cpp
-        NativeTemplate.cpp
+        #native-lib.cpp
+        JNI-bridge.cpp
         ${CORE_DIR}/Source/test.cpp)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
