@@ -6,8 +6,8 @@
 
 #include "test.hpp"
 #include "Engine.hpp"
-#include "Time/Time.hpp"
-#include "Log/Profiler.hpp"
+#include "Time.hpp"
+#include "Profiler.hpp"
 
 namespace
 {

@@ -19,7 +19,7 @@
 #include <math.h>
 #include <time.h>
 #include "Engine.hpp"
-#include "Time/Time.hpp"
+#include "Time.hpp"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)

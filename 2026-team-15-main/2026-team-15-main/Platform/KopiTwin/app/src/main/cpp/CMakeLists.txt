@@ -23,19 +23,8 @@ file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS ${CORE_DIR}/Source/*.cpp)
 # Header folders, listed by hand. A new folder under Core/Header must be added here.
 set(CORE_INCLUDE_DIRS
         ${CORE_DIR}/Header
-        ${CORE_DIR}/Header/AR
-        ${CORE_DIR}/Header/Audio
-        ${CORE_DIR}/Header/Button
-        ${CORE_DIR}/Header/Camera
-        ${CORE_DIR}/Header/Collider
-        ${CORE_DIR}/Header/ECS
-        ${CORE_DIR}/Header/GameObject
-        ${CORE_DIR}/Header/Log
-        ${CORE_DIR}/Header/Math
-        ${CORE_DIR}/Header/Particles
-        ${CORE_DIR}/Header/Render
-        ${CORE_DIR}/Header/Transform
-        ${NLOHMANN_INCLUDE_LIB})
+        ${NLOHMANN_INCLUDE_LIB}
+	${ARCORE_INCLUDE_DIR})
 
 # The library that goes into the APK. Its name must match System.loadLibrary("kopitwin").
 add_library(${CMAKE_PROJECT_NAME} SHARED
@@ -43,8 +32,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         ${CORE_SOURCES})
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-        ${CORE_INCLUDE_DIRS}
-        ${ARCORE_INCLUDE_DIR})
+        ${CORE_INCLUDE_DIRS})
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
         android
