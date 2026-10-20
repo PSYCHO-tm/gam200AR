@@ -71,6 +71,8 @@ Checks: >-
   -hicpp-uppercase-literal-suffix,
   -hicpp-vararg,
 
+  -readability-braces-around-statements,
+
   -cert-dcl03-c,
   -cert-dcl16-c,
   -cert-dcl37-c,
@@ -90,6 +92,10 @@ HeaderFilterRegex: '^(?!.*/build/).+'
 FormatStyle: file
 
 CheckOptions:
+
+  # __ If Else _______________________________________________________________
+  - key:   readability-braces-around-statements.ShortStatementLines
+    value: '1'
 
   # ── Namespaces ────────────────────────────────────────────────────────────
   - key: readability-identifier-naming.NamespaceCase

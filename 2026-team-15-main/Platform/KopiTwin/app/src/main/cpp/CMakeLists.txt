@@ -2,45 +2,41 @@
 # documentation: https://d.android.com/studio/projects/add-native-code.html.
 # For more examples on how to use CMake, see https://github.com/android/ndk-samples.
 
-# Sets the minimum CMake version required for this project.
 cmake_minimum_required(VERSION 3.22.1)
 
-# Declares the project name. The project name can be accessed via ${ PROJECT_NAME},
-# Since this is the top level CMakeLists.txt, the project name is also accessible
-# with ${CMAKE_PROJECT_NAME} (both CMake variables are in-sync within the top level
-# build script scope).
 project("kopitwin")
 
+# Repo root = six folders above this file (Platform/KopiTwin/app/src/main/cpp)
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../.." ABSOLUTE)
 set(CORE_DIR ${REPO_ROOT}/Core)
 
-# Creates and names a library, sets it as either STATIC
-# or SHARED, and provides the relative paths to its source code.
-# You can define multiple libraries, and CMake builds them for you.
-# Gradle automatically packages shared libraries with your APK.
-#
-# In this top level CMakeLists.txt, ${CMAKE_PROJECT_NAME} is used to define
-# the target library name; in the sub-module's CMakeLists.txt, ${PROJECT_NAME}
-# is preferred for the same purpose.
-#
-# In order to load a library into your app from Java/Kotlin, you must call
-# System.loadLibrary() and pass the name of the library defined here;
-# for GameActivity/NativeActivity derived applications, the same library name must be
-# used in the AndroidManifest.xml file.
+# Precompiled headers caused build errors earlier, so they stay off.
+set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
+
+# Downloads SDL3, nlohmann json and ARCore into Extern/ (runs at Sync, before compiling).
+# It also defines NLOHMANN_INCLUDE_LIB, ARCORE_INCLUDE_DIR and ARCORE_LIB_DIR.
+include(${REPO_ROOT}/cmake/GetDependencies.cmake)
+
+# Every .cpp under Core/Source is compiled into the library.
+file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS ${CORE_DIR}/Source/*.cpp)
+
+# Header folders, listed by hand. A new folder under Core/Header must be added here.
+set(CORE_INCLUDE_DIRS
+        ${CORE_DIR}/Header
+        ${NLOHMANN_INCLUDE_LIB}
+	${ARCORE_INCLUDE_DIR})
+
+# The library that goes into the APK. Its name must match System.loadLibrary("kopitwin").
 add_library(${CMAKE_PROJECT_NAME} SHARED
-        # List C/C++ source files with relative paths to this CMakeLists.txt.
-        #native-lib.cpp
         JNI-bridge.cpp
-        ${CORE_DIR}/Source/test.cpp)
+        ${CORE_SOURCES})
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-        ${CORE_DIR}/Header)
+        ${CORE_INCLUDE_DIRS})
 
-# Specifies libraries CMake should link to your target library. You
-# can link libraries from various origins, such as libraries defined in this
-# build script, prebuilt third-party libraries, or Android system libraries.
 target_link_libraries(${CMAKE_PROJECT_NAME}
-        # List libraries link to the target library
         android
         GLESv3
-        log)
+        log
+        SDL3::SDL3
+        ${ARCORE_LIB_DIR}/${ANDROID_ABI}/libarcore_sdk_c.so)

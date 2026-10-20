@@ -1,32 +1,24 @@
-{  
-  "SCENARIO":{
-    "Tutorial":{
-      "Key"   : 0,
-      "Time"  : 0,
-      "Units" : "sec",
-
-      "Visual": {},
-      "Audio" : {}
-
+{
+  "SCENARIO": {
+    "Tutorial": { 
+      "Order": 0, 
+      "TimeLimitSec": 0,
+      "Grading": "Default",
+      "Orders": [ { "Drink": "Kopi", "Count": 1 } ] 
     },
 
-    "Normal":{
-      "Key"   : 1,
-      "Time"  : 270,
-      "Units" : "sec",
-
-      "Visual": {},
-      "Audio" : {}
+    "Normal":   { 
+      "Order": 1, 
+      "TimeLimitSec": 270, 
+      "Grading": "Default",
+      "Orders": [ { "Drink": "Kopi", "Count": 2 }, { "Drink": "Kopi_O", "Count": 2 } ] 
     },
 
-    "Rushhour":{
-      "Key" : 2,
-      "Time"  : 320,
-      "Units" : "sec",
- 
-      "Visual": {},
-      "Audio" : {}
+    "Rushhour": { 
+      "Order": 2, 
+      "TimeLimitSec": 320, 
+      "Grading": "Default",
+      "Orders": [ { "Drink": "Kopi_Peng", "Count": 4 }, { "Drink": "Kopi_C", "Count": 4 } ] 
     }
-
   }
-}	
+}

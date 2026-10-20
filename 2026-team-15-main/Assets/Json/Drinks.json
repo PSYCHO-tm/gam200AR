@@ -1,54 +1,42 @@
-{  
-  "DRINKS":{
-    "Kopi"      : {
-        "Name"    : "Kopi",
-        "Recipe"  : "Kopi_recipe",
-        "Status"  : "Hot",
-
-        "Visual"  : {},
-        "Audio"   : {}
-    },
-
-    "Kopi O"    :  {
-        "Name"    : "Kopi_O",
-        "Recipe"  : "Kopi_O_recipe",
-        "Status"  : "Hot",
-
-        "Visual"  : {},
-        "Audio"   : {}
-    },
-
-    "Kopi C" :  {
-        "Name"    : "Kopi_C",
-        "Recipe"  : "Kopi_C_recipe",
-        "Status"  : "Hot",
-
-        "Visual"  : {},
-        "Audio"   : {}
-    },
-
-    "Kopi Gau" :  {
-        "Name"    : "Kopi_Gau",
-        "Recipe"  : "Kopi_Gau_recipe",
-        "Status"  : "Hot",
-
-        "Visual"  : {},
-        "Audio"   : {}
-    },
-
-
-    "Kopi Peng" :  {
-        "Name"    : "Kopi_Peng",
-        "Recipe"  : "Kopi_Peng_recipe",
-        "Status"  : "Iced",
-
-        "Visual"  : {},
-        "Audio"   : {}
-    }
-
-
-
+{  "DRINKS": {
+    "Kopi": { "Components": {
+      "Name":      { "Value": "Kopi" },
+      "RecipeRef": { "Id": "Kopi_recipe" },
+      "Temp":      { "Status": "Hot" },
+      "Visual":    {},
+      "Audio":     {}
+    }},
     
+    "Kopi_O": { "Components": {
+      "Name":      { "Value": "Kopi O" },
+      "RecipeRef": { "Id": "Kopi_O_recipe" },
+      "Temp":      { "Status": "Hot" },
+      "Visual":    {},
+      "Audio":     {}
+    }},
+
+    "Kopi_C": { "Components": {
+      "Name":      { "Value": "Kopi C" },
+      "RecipeRef": { "Id": "Kopi_C_recipe" },
+      "Temp":      { "Status": "Hot" },
+      "Visual":    {},
+      "Audio":     {}
+    }},
+
+    "Kopi_Gau": { "Components": {
+      "Name":      { "Value": "Kopi Gau" },
+      "RecipeRef": { "Id": "Kopi_Gau_recipe" },
+      "Temp":      { "Status": "Hot" },
+      "Visual":    {},
+      "Audio":     {}
+    }},
+
+    "Kopi_Peng": { "Components": {
+      "Name":      { "Value": "Kopi Peng" },
+      "RecipeRef": { "Id": "Kopi_Peng_recipe" },
+      "Temp":      { "Status": "Iced" },
+      "Visual":    {},
+      "Audio":     {}
+    }}
   }
-  
 }	
