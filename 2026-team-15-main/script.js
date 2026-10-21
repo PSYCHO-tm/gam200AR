@@ -1,24 +1,86 @@
 /* BLUEPRINT-JS-START */
-// 🚀 Auto-generado para cpp: 10/21/2026, 3:27:59 PM
+// 🚀 Auto-generado para cpp: 10/21/2026, 10:04:58 PM
 
 'use strict';
 
-console.log('✅ 2 funciones y 2 clases detectadas');
+console.log('✅ 15 funciones y 0 clases detectadas');
 
 // Funciones interactivas
-function demo_SetAnchorPose() {
-    console.log('▶️ Ejecutando: SetAnchorPose()');
-    alert('Función SetAnchorPose() ejecutada');
+function demo_ArInitialise() {
+    console.log('▶️ Ejecutando: ArInitialise()');
+    alert('Función ArInitialise() ejecutada');
 }
 
-function demo_SetOrderView() {
-    console.log('▶️ Ejecutando: SetOrderView()');
-    alert('Función SetOrderView() ejecutada');
+function demo_ArSessionCreate() {
+    console.log('▶️ Ejecutando: ArSessionCreate()');
+    alert('Función ArSessionCreate() ejecutada');
 }
 
-// Clases detectadas
-console.log('📦 Clase: INPUT_KIND');
-console.log('📦 Clase: InteractionEngine');
+function demo_ArSessionResume() {
+    console.log('▶️ Ejecutando: ArSessionResume()');
+    alert('Función ArSessionResume() ejecutada');
+}
+
+function demo_ArSessionPause() {
+    console.log('▶️ Ejecutando: ArSessionPause()');
+    alert('Función ArSessionPause() ejecutada');
+}
+
+function demo_ArSessionDestroy() {
+    console.log('▶️ Ejecutando: ArSessionDestroy()');
+    alert('Función ArSessionDestroy() ejecutada');
+}
+
+function demo_ArCameraInit() {
+    console.log('▶️ Ejecutando: ArCameraInit()');
+    alert('Función ArCameraInit() ejecutada');
+}
+
+function demo_ArCameraDraw() {
+    console.log('▶️ Ejecutando: ArCameraDraw()');
+    alert('Función ArCameraDraw() ejecutada');
+}
+
+function demo_ArCameraResize() {
+    console.log('▶️ Ejecutando: ArCameraResize()');
+    alert('Función ArCameraResize() ejecutada');
+}
+
+function demo_CompileShader() {
+    console.log('▶️ Ejecutando: CompileShader()');
+    alert('Función CompileShader() ejecutada');
+}
+
+function demo_BuildProgram() {
+    console.log('▶️ Ejecutando: BuildProgram()');
+    alert('Función BuildProgram() ejecutada');
+}
+
+function demo_CameraDrawingInit() {
+    console.log('▶️ Ejecutando: CameraDrawingInit()');
+    alert('Función CameraDrawingInit() ejecutada');
+}
+
+function demo_CameraDrawUpdate() {
+    console.log('▶️ Ejecutando: CameraDrawUpdate()');
+    alert('Función CameraDrawUpdate() ejecutada');
+}
+
+function demo_SphereDrawingInit() {
+    console.log('▶️ Ejecutando: SphereDrawingInit()');
+    alert('Función SphereDrawingInit() ejecutada');
+}
+
+function demo_BuildSphere() {
+    console.log('▶️ Ejecutando: BuildSphere()');
+    alert('Función BuildSphere() ejecutada');
+}
+
+function demo_SphereDrawUpdate() {
+    console.log('▶️ Ejecutando: SphereDrawUpdate()');
+    alert('Función SphereDrawUpdate() ejecutada');
+}
+
 
 // 🎮 Motor de Juego Pro (BluePrint Engine)
 const Game = {

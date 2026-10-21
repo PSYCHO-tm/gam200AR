@@ -31,7 +31,7 @@ static bool geometryDirty = true;
 static void CameraDrawingInit();
 static void CameraDrawUpdate();
 
-//Shpere Draw
+//Sphere Draw
 static GLuint sphereProgram = 0;
 static GLint sphereModelLoc = -1;
 static GLint sphereViewLoc = -1;
