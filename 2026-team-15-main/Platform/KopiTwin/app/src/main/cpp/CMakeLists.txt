@@ -20,9 +20,12 @@ include(${REPO_ROOT}/Cmake/GetDependencies.cmake)
 # Every .cpp under Core/Source is compiled into the library.
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS ${CORE_DIR}/Source/*.cpp)
 
-# interactionEngine.cpp is the old Sim:: picking engine. Its picking.hpp is commented out and equipmentDef.hpp now holds the
-# EquipmentScene version, so it cannot compile. Nothing in this build uses it (EquipmentScene does the picking now).
-list(FILTER CORE_SOURCES EXCLUDE REGEX "/interactionEngine\\.cpp$")
+# Two old files must stay out of the library:
+#  - interactionEngine.cpp: old Sim:: picking engine. picking.hpp is commented out and equipmentDef.hpp is now the
+#    EquipmentScene version, so it cannot compile. EquipmentScene does the picking now.
+#  - test-json.cpp: an older copy of DeserializeStream / DeserializePath / SerializeObj. DefinitionLoader.cpp defines the
+#    same three, so linking both gives "duplicate symbol". test-json.hpp is still used, since it only declares them.
+list(FILTER CORE_SOURCES EXCLUDE REGEX "/(interactionEngine|test-json)\\.cpp$")
 
 # Header folders, listed by hand. A new folder under Core/Header must be added here.
 set(CORE_INCLUDE_DIRS
