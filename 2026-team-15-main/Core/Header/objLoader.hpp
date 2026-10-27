@@ -3,12 +3,9 @@
 #include <optional>
 #include <string>
 
-#include "meshData.hpp"
+#include "Geometry.hpp"
 
-namespace Sim
-{
-	// Wavefront OBJ: v, vt, vn, f (v, v/vt, v//vn, v/vt/vn), negative indices, polygons (fan triangulated).
-	// Missing normals are generated. Returns nullopt for a missing file, a bad index or no geometry.
-	std::optional<MeshData> LoadObj(std::string const& path);
-	std::optional<MeshData> ParseObj(std::string const& text);
-}
+// Wavefront OBJ text: v, vt, vn, f (v, v/vt, v//vn, v/vt/vn), negative indices, polygons (fan triangulated).
+// Missing normals are generated. Returns nullopt for a bad index or no geometry.
+// Takes the file's TEXT, not a path: on Android the files are baked into the app by CMake (see EmbedAssets.cmake).
+std::optional<MeshData> ParseObj(std::string const& text);

@@ -2,13 +2,6 @@
 #include "sharedlib.hpp"
 #include "ComponentArray.hpp"
 
-struct Name      { std::string Value; };
-struct RecipeRef { std::string Id; };
-struct Temp      { std::string Status; };
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Name, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RecipeRef, Id)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Temp, Status)
 namespace Ecs{
 /*
 	Components are plain data STRUCTS. Contains variables but no logic / functions
@@ -200,29 +193,4 @@ namespace Ecs{
 
        	return std::static_pointer_cast<ComponentArray<T>>(pos->second)->HasData(entity);
 	}
-
-
-	struct IngredientDef {
-    std::string Name, Units;
-    Json Visual, Audio;
-    std::vector<std::string> State;       // optional
-    std::vector<std::string> Sweetened;   // optional
-	};
-
-	struct RecipeIngredient { double Amount = 0; std::string State, Sweetened; };
-	struct RecipeDef {
-		std::unordered_map<std::string, RecipeIngredient> Ingredients;
-		Json Visual, Audio;
-	};
-
-	struct DrinkDef    { std::string Name, Recipe, Status; Json Visual, Audio; };
-	struct ScenarioDef { int Key = 0; double Time = 0; std::string Units; Json Visual, Audio; };
-	struct GradeTier   { std::string Grade; double Score = 0; };
-
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(IngredientDef, Name, Units, Visual, Audio, State, Sweetened)
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(RecipeIngredient, Amount, State, Sweetened)
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(RecipeDef, Ingredients, Visual, Audio)
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(DrinkDef, Name, Recipe, Status, Visual, Audio)
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScenarioDef, Key, Time, Units, Visual, Audio)
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GradeTier, Grade, Score)
 }

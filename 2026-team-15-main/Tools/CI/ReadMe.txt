@@ -4,8 +4,9 @@ One script builds the shared code (`Core/`), builds every test in `Tests/`, and 
 
 ### Requirements
 - Linux or WSL (Windows users: run everything inside WSL, not PowerShell)
-- `g++` 12 or newer, `cmake` 3.14 or newer, `git`
-  - `sudo apt install build-essential cmake git`
+Run this:
+sudo apt update
+sudo apt install -y build-essential cmake git
 - Internet on the **first** run only (it downloads Catch2 into `build/`)
 
 ### Run all tests

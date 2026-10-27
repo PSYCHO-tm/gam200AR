@@ -5,9 +5,13 @@
 
 namespace TestCore
 {
-    std::string OnTouch(int action, float x, float y)
+    std::string OnTouch()
     {
-        return "core got action = " + std::to_string(action) +
-               " x= " + std::to_string(x) + " y= " + std::to_string(y);
+        InputSnapshot const& snapshot = Core::GetInput().getSnapshot();
+        //InputState const& state = Core::GetInput().getState();
+        return "Tapped: " + std::to_string(snapshot.tapped) +
+               " X Coords: " + std::to_string(snapshot.is.px) +
+               " Y Coords: " + std::to_string(snapshot.is.py) +
+               " Held Time: " + std::to_string(snapshot.heldTime);
     }
 }

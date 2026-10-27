@@ -1,0 +1,21 @@
+{  
+  "schema_version": 1,
+  "instances": [
+    {
+      "kind": "DRINKS",
+      "def": "Kopi"
+    },
+
+    {
+      "kind": "DRINKS",
+      "def": "Kopi",
+      "overrides": { "Temp": { "Status": "Iced"}}
+    },
+    
+    {
+      "kind": "INGREDIENTS",
+      "def": "water"
+    }
+  ]
+  
+}

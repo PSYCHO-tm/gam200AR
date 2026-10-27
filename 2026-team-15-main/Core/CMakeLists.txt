@@ -1,9 +1,10 @@
-# Look for .cpp files in Core/Source AND compile into a library
-file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "Source/*.cpp")
+include(${CMAKE_SOURCE_DIR}/Cmake/GetDependencies.cmake) # Use dependencies macros
+get_json()
 
-list(FILTER CORE_SOURCES EXCLUDE REGEX "/test\\.cpp$") # in case test.cpp breaks the build
+file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "Source/*.cpp")
+list(FILTER CORE_SOURCES EXCLUDE REGEX "/test\\.cpp$")     #  exclude placeholder test file
+list(FILTER CORE_SOURCES EXCLUDE REGEX "/ARcore\\.cpp$")   #  Android-only, exclude from build test
 
 add_library(ci_core STATIC ${CORE_SOURCES})
-
-# Anything linked to ci_core can write #include "[Component_name]/[header].hpp"
-target_include_directories(ci_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Header)
+target_include_directories(ci_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Header) 
+target_link_libraries(ci_core PUBLIC nlohmann_json::nlohmann_json)

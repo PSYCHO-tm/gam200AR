@@ -1,9 +1,8 @@
+# Use dependencies
+include(${CMAKE_SOURCE_DIR}/Cmake/GetDependencies.cmake)
+
 # Install Catch2 if it doesn't exist on device
-include(FetchContent)
-FetchContent_Declare(Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        v3.16.0)
-FetchContent_MakeAvailable(Catch2)
+get_catch2()
 
 # Every .cpp under Tests/ becomes part of one test executable
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "*.cpp")

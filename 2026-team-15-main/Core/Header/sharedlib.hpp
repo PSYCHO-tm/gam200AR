@@ -8,6 +8,7 @@
 #include <bitset>
 #include <memory>
 #include <cassert>
+#include <map>
 #include <array>
 #include <unordered_map>
 #include <fstream>
@@ -17,8 +18,8 @@
 #include <string>
 #include <cstdint>
 #include <functional>
-#include <GLES3/gl3.h>
-
+#include "nlohmann/json.hpp"
+//#include "json.hpp"
 
 namespace Ecs{
     constexpr uint32_t MAX_ENTITIES{1000};
@@ -29,7 +30,8 @@ namespace Ecs{
     using ComponentType = uint8_t; //used as uint8_t to save mem
     using Json = nlohmann::json;
 
-    using ErrorChecker = std::vector<std::string>;
+    //ErrorChecker would be a vector that stores the errors in any place of stdcerr
+    using ErrorChecker = std::vector<std::string>; 
 }
 
 

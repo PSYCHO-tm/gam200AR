@@ -5,10 +5,11 @@
 #define TEST_CORE
 
 #include <string>
+#include "Engine.hpp"
 
 namespace TestCore
 {
-    std::string OnTouch(int action, float x, float y);
+    std::string OnTouch();
 }
 
 #endif

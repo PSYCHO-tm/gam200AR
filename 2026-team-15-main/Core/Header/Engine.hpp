@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Types.hpp"
+#include "Input.hpp"
 
 namespace Core
 {
@@ -20,10 +21,19 @@ namespace Core
     inline bool isPaused{ false };
     inline bool applicationRunning{ true };
 
+    inline InputProcessing mInput;
+    inline InputProcessing& GetInput() { return mInput; }
+
+    inline int viewportW{ 1 };   // screen size in pixels, set by Resize
+    inline int viewportH{ 1 };
+
     void Init();
-    void Frame(UI64 nowT);   // Execute one iteration of the loop body
+    void Resize(int width, int height);   // when the surface size changes
+    void Update(UI64 nowT);   // Execute one iteration of the loop body
+    void Render();            // Draw: camera picture, then the equipment
+    void Exit();
     void OnResume();         // Execute on e.g. if app returned from background
 
     UI32 GetOverlayText(char* buf, UI32 size);
-    void PauseTime();
+    void PauseTime(bool p);
 }
