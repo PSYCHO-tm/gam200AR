@@ -1,0 +1,31 @@
+{
+  "SIMULATION": {
+
+    "Orders": {
+      "InitialDelaySec":  1,
+      "SpawnIntervalSec": 10,
+      "PatienceSec":      45,
+      "MaxQueue":         4,
+      "Seed":             7
+    },
+
+    "Grading": {
+      "QuantityTolerance": 0.10
+    },
+
+    "Inventory": {
+      "coffee_beans":    { "Start": 50,  "RefillAmount": 200, "LowThreshold": 25 },
+      "water":           { "Start": 600, "RefillAmount": 1000, "LowThreshold": 250 },
+      "evaporated_milk": { "Start": 12,  "RefillAmount": 20,  "LowThreshold": 4 },
+      "condensed_milk":  { "Start": 12,  "RefillAmount": 20,  "LowThreshold": 4 },
+      "sugar":           { "Start": 10,  "RefillAmount": 20,  "LowThreshold": 4 },
+      "ice":             { "Start": 40,  "RefillAmount": 80,  "LowThreshold": 16 }
+    },
+
+    "Conditions": [
+      { "Name": "Rush Hour",    "StartSec": 12, "DurationSec": 20, "OrderRateMultiplier": 2.0, "PatienceMultiplier": 0.7 },
+      { "Name": "Slow Machine", "StartSec": 60, "DurationSec": 30, "OrderRateMultiplier": 0.5, "PatienceMultiplier": 1.0 }
+    ]
+
+  }
+}

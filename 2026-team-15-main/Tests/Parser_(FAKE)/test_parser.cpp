@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "Parser_(FAKE)/parser.hpp"
+#include "parser.hpp"
 
 using namespace Kopi;
 

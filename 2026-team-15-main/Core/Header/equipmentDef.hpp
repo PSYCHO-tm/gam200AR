@@ -6,45 +6,38 @@
 #include <string>
 #include <vector>
 
-#include "aabb.hpp"
-#include "vectors.hpp"
+#include "Collider.hpp"
+#include "Vector.hpp"
 
-namespace Sim
+struct InteractionDef
 {
-	struct InteractionDef
-	{
-		std::string Action;     // id the assessment core understands, e.g. "pour_water"
-		std::string Label;      // text for the button
-		std::string Ingredient; // ingredient id from Ingredients.json, e.g. "water"
-		float       Quantity = 0.0f;
-		std::string Units;
-	};
+    std::string action;     // id the assessment core understands, e.g. "pour_water"
+    std::string label;      // text for the button
+    std::string ingredient; // ingredient id from Ingredients.json, e.g. "water"
+    float       quantity = 0.0f;
+    std::string units;
+};
 
-	struct EquipmentDef
-	{
-		std::string                 Id; // key in the JSON, e.g. "Kettle"
-		std::string                 Name;
-		std::string                 MeshPath; // relative to the repo root
-		Vec3                        Position; // anchor-local meters
-		float                       YawDeg = 0.0f;
-		float                       Scale  = 1.0f;
-		std::vector<InteractionDef> Interactions;
-		Aabb                        LocalBounds; // filled from the mesh by AttachMeshBounds
-		bool                        HasBounds = false;
-	};
+struct EquipmentDef
+{
+    std::string                 id; // key in the JSON, e.g. "Kettle"
+    std::string                 name;
+    std::string                 meshPath; // relative to the repo root, e.g. "Assets/Models/kettle.obj"
+    Vector3D                    position{0.0f, 0.0f, 0.0f}; // anchor-local meters
+    float                       yawDeg = 0.0f;
+    float                       scale  = 1.0f;
+    std::vector<InteractionDef> interactions;
+    Collider                    localBounds; // the mesh's box, filled in by whoever loads the mesh
+};
 
-	struct EquipmentLibrary
-	{
-		std::vector<EquipmentDef> Items; // JSON key order is not preserved; sorted by Id for stable output
-	};
+class EquipmentLibrary
+{
+public:
+    std::vector<EquipmentDef> items; // JSON key order is not preserved; sorted by id for stable output
 
-	// sourceName is only used in error messages. Errors name the equipment and the field.
-	bool ParseEquipment(std::string const& text, std::string const& sourceName, EquipmentLibrary& library,
-	                    std::string& error);
-	bool LoadEquipmentFile(std::string const& path, EquipmentLibrary& library, std::string& error);
+    // sourceName is only used in error messages. Errors name the equipment and the field.
+    // On failure 'items' is left untouched.
+    bool Parse(std::string const& text, std::string const& sourceName, std::string& error);
 
-	// Loads each mesh (paths are relative to rootDir) and stores its bounds. Fails with the path in the message.
-	bool AttachMeshBounds(EquipmentLibrary& library, std::string const& rootDir, std::string& error);
-
-	EquipmentDef const* FindEquipment(EquipmentLibrary const& library, std::string const& id);
-}
+    EquipmentDef const* Find(std::string const& id) const;
+};

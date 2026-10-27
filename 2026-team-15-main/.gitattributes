@@ -7,3 +7,7 @@ gradlew  text eol=lf
 
 # Windows batch files CRLF
 *.bat    text eol=crlf
+
+# gradlew
+gradlew text eol=lf
+*.bat text eol=crlf

@@ -51,18 +51,18 @@ bool ArSessionPause();
 void ArSessionDestroy();
 
 /**
- * @brief   Creates the camera texture and builds the camera and sphere programs.
+ * @brief   Creates the camera texture and builds the camera program.
  * @details Runs on the drawing thread, once for each new OpenGL context. The
  *          texture is where ARCore writes each camera picture.
  */
 void ArCameraInit();
 
 /**
- * @brief   Runs once per frame: updates ARCore, then draws the camera and sphere.
+ * @brief   Runs once per frame: updates ARCore, then draws the camera picture.
  * @details Tells ARCore about the camera texture and screen size if it does not
  *          know them yet, asks ARCore for the newest frame, then draws the camera
- *          picture first and the sphere on top. If the update fails, nothing is
- *          drawn that frame.
+ *          picture. The equipment is drawn after this by Core::Render. If the
+ *          update fails, nothing is drawn that frame.
  */
 void ArCameraDraw();
 
@@ -75,3 +75,14 @@ void ArCameraDraw();
  * @param[in] rotation  Screen rotation: 0, 1, 2 or 3 (Android Surface.ROTATION_*).
  */
 void ArCameraResize(int width, int height, int rotation);
+
+/**
+ * @brief   Gives the phone camera's view and projection matrices from the latest frame.
+ * @details Call after ArCameraDraw. Only valid while ARCore is tracking, and for a
+ *          few frames after it drops, because only then can the phone's position
+ *          be trusted.
+ * @param[out] view        16 floats, in the layout OpenGL uses (column-major).
+ * @param[out] projection  16 floats, same layout.
+ * @return  true if both were written, otherwise false (nothing is written).
+ */
+bool ArGetCameraMatrices(float* view, float* projection);

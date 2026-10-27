@@ -1,20 +1,23 @@
 {
   "SCENARIO": {
-    "Tutorial": { 
+    "Tutorial": 
+    { 
       "Order": 0, 
       "TimeLimitSec": 0,
       "Grading": "Default",
       "Orders": [ { "Drink": "Kopi", "Count": 1 } ] 
     },
 
-    "Normal":   { 
+    "Normal":   
+    { 
       "Order": 1, 
       "TimeLimitSec": 270, 
       "Grading": "Default",
       "Orders": [ { "Drink": "Kopi", "Count": 2 }, { "Drink": "Kopi_O", "Count": 2 } ] 
     },
 
-    "Rushhour": { 
+    "Rushhour": 
+    { 
       "Order": 2, 
       "TimeLimitSec": 320, 
       "Grading": "Default",

@@ -18,6 +18,8 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import android.widget.Button // For Buttons (temporary)
 import android.view.Gravity  // For Object alignment and order (temporary)
+import android.view.MotionEvent
+
 //import com.example.kopitwin.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -28,12 +30,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var glView: GLSurfaceView
     private lateinit var infoText: TextView
     private lateinit var statsText: TextView
-    private lateinit var interaction: InteractionPanel   // Goal 5
 
     private external fun nativeInit(): Boolean
     private external fun nativeResize(width: Int, height: Int)
     private external fun nativeArDisplay(width: Int, height: Int, rotation: Int)
-    private external fun nativeRender()
 
     private external fun nativeArStart(): Boolean
     private external fun nativeArStop()
@@ -55,7 +55,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         infoText = TextView(this).apply {
-            textSize = 32f
+            textSize = 20f
+            typeface = android.graphics.Typeface.MONOSPACE   // keeps the columns aligned
             setTextColor(Color.WHITE)
             setBackgroundColor(Color.RED)
             setPadding(8, 8, 8, 8)
@@ -65,11 +66,11 @@ class MainActivity : AppCompatActivity() {
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         )
-        infoParams.leftMargin = 300
-        infoParams.topMargin = 1000
+        //infoParams.leftMargin = 300
+        infoParams.topMargin = 300
 
         statsText = TextView(this).apply {
-            textSize = 14f
+            textSize = 16f
             typeface = android.graphics.Typeface.MONOSPACE   // keeps the columns aligned
             setTextColor(Color.WHITE)
             setBackgroundColor(Color.BLUE)           // semi-transparent black
@@ -86,13 +87,10 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener {
                 arPaused = !arPaused
                 text = if (arPaused) "Resume" else "Pause"
-                if (arPaused) {
-                    glView.queueEvent { nativeArStop() }
-                } else {
-                    glView.queueEvent {
-                        nativeArStart()
-                        NativeCore.onResume()
-                    } }
+                glView.queueEvent {
+                    if (arPaused) nativeArStop() else nativeArStart()
+                }
+                NativeCore.nativeTogglePause(arPaused)
             }
         }
 
@@ -110,21 +108,22 @@ class MainActivity : AppCompatActivity() {
             setRenderer(object : GLSurfaceView.Renderer {
                 override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
                     nativeInit()
-		    InteractionNative.nativeInteractionInitGl()
                 }
                 override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
                     nativeResize(width, height)
-		    InteractionNative.nativeInteractionResize(width, height)
                     nativeArDisplay(width, height, displayRotation())
                 }
                 override fun onDrawFrame(gl: GL10?) {
-                    NativeCore.frame()
-                    nativeRender()
-		    InteractionNative.nativeInteractionDraw()
+                    NativeCore.update()                                // update + draw, all in C++
 
                     if (++overlayTick % 15 == 0) {                    // about 4 times per second at 60 fps
                         val text = NativeCore.nativeOverlayText()     // on the GL thread
                         this@MainActivity.runOnUiThread { statsText.text = text }
+                    }
+
+                    if (overlayTick % 4 == 0) {                       // ~15 Hz touch readout
+                        val touch = NativeCore.nativeGetTouch()       // GL thread, same as the input code
+                        this@MainActivity.runOnUiThread { infoText.text = touch }
                     }
                 }
             })
@@ -132,10 +131,10 @@ class MainActivity : AppCompatActivity() {
 
         glView.setOnTouchListener { _, e ->
             infoText.visibility = View.VISIBLE
-            infoText.x = e.x
-            infoText.y = e.y
-            infoText.text = NativeCore.nativeTouch(e.actionMasked, e.x, e.y)//reply
-	    interaction.onTouch(e)
+            val x = e.x
+            val y = e.y
+            val action = e.actionMasked   // copied now: Android reuses the event after this returns
+            glView.queueEvent { NativeCore.nativeSetInput(x, y, action) }
             true
         }
 
@@ -145,24 +144,17 @@ class MainActivity : AppCompatActivity() {
         layout.addView(infoText, infoParams)
         layout.addView(pauseButton, buttonParams)
 
-   	interaction = InteractionPanel(this)
-   	interaction.load()?.let { problem ->
-       	    infoText.text = problem
-       	    infoText.visibility = View.VISIBLE
-   	}
-   	layout.addView(interaction.root, FrameLayout.LayoutParams(
-       	    FrameLayout.LayoutParams.MATCH_PARENT,
-       	    FrameLayout.LayoutParams.WRAP_CONTENT,
-       	    Gravity.BOTTOM
-   	))
 
         setContentView(layout)
     }
 
     override fun onPause() {
-	interaction.stop()
-        glView.onPause()
         nativeArStop()
+        glView.onPause()
+        glView.queueEvent {
+            NativeCore.nativeTogglePause(arPaused)
+            NativeCore.nativeResetInput()
+        }
         super.onPause()
     }
 
@@ -171,8 +163,10 @@ class MainActivity : AppCompatActivity() {
         arPaused = false
         pauseButton.text = "Pause"
         glView.onResume()
-	interaction.start()
-        glView.queueEvent { NativeCore.onResume() }
+        glView.queueEvent {
+            NativeCore.nativeTogglePause(arPaused)
+            NativeCore.onResume()
+        }
         super.onResume()
     }
 

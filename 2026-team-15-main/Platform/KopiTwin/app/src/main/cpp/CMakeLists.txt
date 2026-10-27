@@ -15,7 +15,7 @@ set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
 
 # Downloads SDL3, nlohmann json and ARCore into Extern/ (runs at Sync, before compiling).
 # It also defines NLOHMANN_INCLUDE_LIB, ARCORE_INCLUDE_DIR and ARCORE_LIB_DIR.
-include(${REPO_ROOT}/cmake/GetDependencies.cmake)
+include(${REPO_ROOT}/Cmake/GetDependencies.cmake)
 
 # Every .cpp under Core/Source is compiled into the library.
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS ${CORE_DIR}/Source/*.cpp)
@@ -24,17 +24,28 @@ file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS ${CORE_DIR}/Source/*.cpp)
 set(CORE_INCLUDE_DIRS
         ${CORE_DIR}/Header
         ${NLOHMANN_INCLUDE_LIB}
-	${ARCORE_INCLUDE_DIR})
+		${ARCORE_INCLUDE_DIR})
 
 # The library that goes into the APK. Its name must match System.loadLibrary("kopitwin").
-add_library(${CMAKE_PROJECT_NAME} SHARED
-        JNI-bridge.cpp
-	JNI-interaction.cpp
-	EquipmentRenderer.cpp
+add_library(${CMAKE_PROJECT_NAME} SHARED	
+	  JNI-bridge.cpp
         ${CORE_SOURCES})
 
+include(${REPO_ROOT}/Cmake/EmbedShader.cmake)
+set(GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+embed_shader(${REPO_ROOT}/Assets/Shader/lit.vert gLitVert ${REPO_ROOT}/Core/Header/lit_vert.hpp)
+embed_shader(${REPO_ROOT}/Assets/Shader/lit.frag gLitFrag ${REPO_ROOT}/Core/Header/lit_frag.hpp)
+
+include(${REPO_ROOT}/Cmake/EmbedAssets.cmake)
+embed_assets(${GEN_DIR}/EmbeddedAssets.hpp
+        Assets/Json/Equipment.json
+        Assets/Models/kettle.obj
+        Assets/Models/sock_filter.obj
+        Assets/Models/condensed_milk_tin.obj)
+
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-        ${CORE_INCLUDE_DIRS})
+        ${CORE_INCLUDE_DIRS}
+	${GEN_DIR})
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
         android

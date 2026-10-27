@@ -13,11 +13,11 @@
 
 #include <jni.h>
 #include <android/log.h>
-#include "test.hpp"
-#include "ARcore.hpp"
-#include <GLES3/gl3.h>
+#include <android/input.h>
 #include <math.h>
 #include <time.h>
+#include "test.hpp"
+#include "ARcore.hpp"
 #include "Engine.hpp"
 #include "Time.hpp"
 
@@ -30,7 +30,7 @@
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_kopitwin_MainActivity_nativeArDisplay(
-JNIEnv* /*env*/, jobject /*thiz*/, jint width, jint height, jint rotation)
+        JNIEnv* /*env*/, jobject /*thiz*/, jint width, jint height, jint rotation)
 {
     ArCameraResize(width, height, rotation);
 }
@@ -47,7 +47,6 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_example_kopitwin_MainActivity_nativeArStop(JNIEnv* /*env*/, jobject /*thiz*/)
 {
     ArSessionPause();
-    Core::PauseTime();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -60,7 +59,6 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_kopitwin_MainActivity_nativeInit(JNIEnv* /*env*/, jobject /*thiz*/)
 {
     LOGI("nativeInit called");
-    ArCameraInit();
     Core::Init();
     return JNI_TRUE;
 }
@@ -69,21 +67,14 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_example_kopitwin_MainActivity_nativeResize(
         JNIEnv* /*env*/, jobject /*thiz*/, jint width, jint height)
 {
-    glViewport(0, 0, width, height);
+    Core::Resize(width, height);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_kopitwin_MainActivity_nativeRender(JNIEnv* /*env*/, jobject /*thiz*/)
+Java_com_example_kopitwin_NativeCore_update(JNIEnv*, jobject)
 {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    ArCameraDraw();
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_example_kopitwin_NativeCore_frame(JNIEnv*, jobject)
-{
-    Core::Frame(Timer::Now());
+    Core::Update(Timer::Now());
+    Core::Render();   // camera picture, then the equipment
 
     // Test logging lives in the shell so the core stays loop/platform-free.
     if (!(Core::frameCount % 60))
@@ -109,8 +100,43 @@ Java_com_example_kopitwin_NativeCore_onResume(JNIEnv*, jobject)
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_kopitwin_NativeCore_nativeTouch(JNIEnv* env, jobject, jint action, jfloat x, jfloat y)
+Java_com_example_kopitwin_NativeCore_nativeGetTouch(JNIEnv* env, jobject)
 {
-    const std::string reply = TestCore::OnTouch(action, x, y);
+    const std::string reply = TestCore::OnTouch();
     return env->NewStringUTF(reply.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_kopitwin_NativeCore_nativeSetInput(JNIEnv*, jobject, jfloat x, jfloat y, jint action)
+{
+    bool down;
+    switch (action)
+    {
+        case AMOTION_EVENT_ACTION_DOWN:
+        case AMOTION_EVENT_ACTION_MOVE:
+            down = true;
+            break;
+        case AMOTION_EVENT_ACTION_UP:
+            down = false;
+            break;
+        case AMOTION_EVENT_ACTION_CANCEL:
+            Core::GetInput().CancelPointer();
+            return;
+        default:
+            return; // ignore other actions, same as the old `when` did
+    }
+
+    Core::GetInput().SetPointer(x, y, down);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_kopitwin_NativeCore_nativeResetInput(JNIEnv*, jobject)
+{
+    Core::GetInput().Reset();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_kopitwin_NativeCore_nativeTogglePause(JNIEnv*, jobject, jboolean p)
+{
+    Core::PauseTime(static_cast<bool>(p));
 }

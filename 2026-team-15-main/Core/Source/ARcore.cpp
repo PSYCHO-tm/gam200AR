@@ -3,8 +3,7 @@
 #include <android/log.h>
 #include <GLES3/gl3.h>
 #include <GLES2/gl2ext.h>
-#include <vector>
-#include <cmath>
+#include <cstring>
 
 #define LOG_TAG "kopitwin"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -20,6 +19,7 @@ static ArSession* session = nullptr;
 static ArConfig* sessionConfig = nullptr;
 static ArFrame* sessionFrame = nullptr;
 static bool textureBound = false;
+static ArTrackableList* sessionList = nullptr;
 
 //AR Camera Draw
 static int displayWidth = 1;
@@ -31,23 +31,11 @@ static bool geometryDirty = true;
 static void CameraDrawingInit();
 static void CameraDrawUpdate();
 
-//Sphere Draw
-static GLuint sphereProgram = 0;
-static GLint sphereModelLoc = -1;
-static GLint sphereViewLoc = -1;
-static GLint sphereProjectionLoc = -1;
-static GLint sphereColourLoc = -1;
-static const float pi = 3.14159265f;
-static const int sphereRings = 12;
-static const int sphereSlices = 24;
-static const float sphereRadius = 0.1f;
-static std::vector<float> sphereVertices;
-static std::vector<unsigned short> sphereIndices;
-
-//OpenGL Object
-static void SphereDrawingInit();
-static void SphereDrawUpdate();
-static void BuildSphere(int rings, int slices, float radius);
+//Camera for drawing (read by ArGetCameraMatrices)
+static float lastView[16]{};
+static float lastProjection[16]{};
+static int framesSinceTracking = 1000;      // 1000 means "never tracked yet"
+static const int holdFrames = 15;           // keep using the last good camera for this many frames after tracking drops
 
 /**
  * @brief   Checks that the phone supports ARCore and that it is installed.
@@ -122,6 +110,7 @@ bool ArSessionCreate(void *env, void *activity)
     if(sessionConfig == nullptr)
     {
         ArConfig_create(session, &sessionConfig);
+        ArConfig_setPlaneFindingMode(session, sessionConfig, AR_PLANE_FINDING_MODE_HORIZONTAL);
         const ArStatus status = ArSession_configure(session, sessionConfig);
         if(status != AR_SUCCESS)
         {
@@ -130,6 +119,11 @@ bool ArSessionCreate(void *env, void *activity)
             sessionConfig = nullptr;
             return false;
         }
+    }
+
+    if(sessionList == nullptr)
+    {
+        ArTrackableList_create(session, &sessionList);
     }
 
     if(sessionFrame == nullptr)
@@ -209,6 +203,12 @@ void ArSessionDestroy()
     }
     sessionConfig = nullptr;
 
+    if(sessionList != nullptr)
+    {
+        ArTrackableList_destroy(sessionList);
+    }
+    sessionList = nullptr;
+
     if(session != nullptr)
     {
         ArSession_destroy(session);
@@ -217,10 +217,11 @@ void ArSessionDestroy()
 
     textureBound = false;
     geometryDirty = true;
+    framesSinceTracking = 1000;
 }
 
 /**
- * @brief   Creates the camera texture and builds the camera and sphere programs.
+ * @brief   Creates the camera texture and builds the camera program.
  * @details Runs on the drawing thread, once for each new OpenGL context. The
  *          texture is where ARCore writes each camera picture.
  */
@@ -237,14 +238,14 @@ void ArCameraInit()
 
     textureBound = false;
     CameraDrawingInit();
-    SphereDrawingInit();
 }
 
 /**
- * @brief   Runs once per frame: updates ARCore, then draws the camera and sphere.
+ * @brief   Runs once per frame: updates ARCore, then draws the camera picture.
  * @details Tells ARCore about the camera texture and screen size if it does not
  *          know them yet, asks ARCore for the newest frame, then draws the camera
- *          picture first and the sphere on top. If the update fails, nothing is
+ *          picture. The equipment is drawn after this by Core::Render, using the
+ *          matrices from ArGetCameraMatrices. If the update fails, nothing is
  *          drawn that frame.
  */
 void ArCameraDraw()
@@ -289,7 +290,14 @@ void ArCameraDraw()
     }
 
     CameraDrawUpdate();
-    SphereDrawUpdate();
+
+    if(sessionList != nullptr)
+    {
+        int32_t n{};
+        ArTrackableList_getSize(session, sessionList, &n);
+        ArSession_getAllTrackables(session, AR_TRACKABLE_PLANE, sessionList);
+        LOGI("The size count is (%d)", n);
+    }
 }
 
 /**
@@ -426,7 +434,7 @@ static void CameraDrawingInit()
  * @brief   Draws the camera picture over the whole screen.
  * @details Asks ARCore which spot of the picture belongs at each screen corner,
  *          then draws the screen-sized rectangle with the camera program.
- *          This is the back layer, drawn before the sphere.
+ *          This is the back layer, drawn before the equipment.
  */
 static void CameraDrawUpdate()
 {
@@ -461,134 +469,28 @@ static void CameraDrawUpdate()
     glDisableVertexAttribArray(1);
 }
 
-///////////////////////////////////////
-//          Sphere Shader            //
-///////////////////////////////////////
-static const char* sphereVertexShader = R"(#version 300 es
-layout(location = 0) in vec3 aPosition;
-uniform mat4 uModel;
-uniform mat4 uView;
-uniform mat4 uProjection;
-out vec3 vNormal;
-void main()
-{
-    vNormal = mat3(uModel) * aPosition;
-    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
-}
-)";
-
-static const char* sphereFragmentShader = R"(#version 300 es
-precision mediump float;
-uniform vec3 uColour;
-in vec3 vNormal;
-out vec4 fragColor;
-void main()
-{
-    vec3 lightDir = normalize(vec3(0.3, 0.8, 0.5));
-    float brightness = max(dot(normalize(vNormal), lightDir), 0.0);
-    float light = 0.3 + 0.7 * brightness;
-    fragColor = vec4(uColour * light, 1.0);
-}
-)";
-
 /**
- * @brief   Builds the sphere program and its points and triangles.
- * @details Builds the sphere's vertex and fragment shaders into a program, finds
- *          where its variables are (uModel, uView, uProjection, uColour), then
- *          calls BuildSphere. Called from ArCameraInit.
+ * @brief   Gives the phone camera's view and projection matrices from the latest frame.
+ * @details Call after ArCameraDraw. Only valid while ARCore is tracking, and for a few
+ *          frames after it drops (the last good camera is held, so the equipment does
+ *          not blink when tracking flickers).
+ * @param[out] view        16 floats, in the layout OpenGL uses (column-major).
+ * @param[out] projection  16 floats, same layout.
+ * @return  true if both were written, otherwise false (nothing is written).
  */
-static void SphereDrawingInit()
+bool ArGetCameraMatrices(float* view, float* projection)
 {
-    sphereProgram = BuildProgram(sphereVertexShader, sphereFragmentShader);
-    if(sphereProgram != 0)
+    if(session == nullptr || sessionFrame == nullptr)
     {
-        sphereModelLoc = glGetUniformLocation(sphereProgram, "uModel");
-        sphereViewLoc = glGetUniformLocation(sphereProgram, "uView");
-        sphereProjectionLoc = glGetUniformLocation(sphereProgram, "uProjection");
-        sphereColourLoc = glGetUniformLocation(sphereProgram, "uColour");
-    }
-
-    BuildSphere(sphereRings, sphereSlices, sphereRadius);
-    LOGI("Sphere program built: %u, %zu points", sphereProgram, sphereVertices.size() / 3);
-}
-
-/**
- * @brief   Builds the sphere's points and triangles.
- * @details Fills sphereVertices with x, y, z for each point, ring by ring, and
- *          sphereIndices with the point numbers of each triangle.
- * @param[in] rings   Number of rings, top to bottom.
- * @param[in] slices  Number of slices, around the sphere.
- * @param[in] radius  Radius of the sphere in metres.
- * @note    The sphere is still hard-coded.
- */
-static void BuildSphere(int rings, int slices, float radius)
-{
-    sphereVertices.clear();
-
-    const float perPhi = static_cast<float>(pi) / static_cast<float>(rings);
-    const float perTheta = 2.0f * static_cast<float>(pi) / static_cast<float>(slices);
-
-    for(int i = 0; i <= rings; ++i)
-    {
-        const float phi = perPhi * static_cast<float>(i);
-        const float sinPhi = sinf(phi);
-        const float cosPhi = cosf(phi);
-
-        for(int j = 0; j <= slices; ++j)
-        {
-            const float theta = perTheta * static_cast<float>(j);
-            sphereVertices.push_back(radius * sinPhi * cosf(theta));   // x
-            sphereVertices.push_back(radius * cosPhi);                 // y
-            sphereVertices.push_back(radius * sinPhi * sinf(theta));   // z
-        }
-    }
-
-    sphereIndices.clear();
-
-    for(int i = 0; i < rings; ++i)
-    {
-        for(int j = 0; j < slices; ++j)
-        {
-            const unsigned short a = static_cast<unsigned short>(i * (slices + 1) + j);
-            const unsigned short b = static_cast<unsigned short>((i + 1) * (slices + 1) + j);
-            const unsigned short c = static_cast<unsigned short>(i * (slices + 1) + (j + 1));
-            const unsigned short d = static_cast<unsigned short>((i + 1) * (slices + 1) + (j + 1));
-
-            sphereIndices.push_back(a);
-            sphereIndices.push_back(b);
-            sphereIndices.push_back(c);
-
-            sphereIndices.push_back(c);
-            sphereIndices.push_back(b);
-            sphereIndices.push_back(d);
-        }
-    }
-}
-
-/**
- * @brief   Draws the sphere on top of the camera picture.
- * @details Only draws while ARCore is tracking, because only then can the
- *          phone's position be trusted. Sends the view and projection matrices
- *          from ARCore, the model matrix and the colour to the GPU, then draws
- *          the triangles.
- * @note    The sphere's position is still hard-coded and is not fixed to a plane.
- */
-static void SphereDrawUpdate()
-{
-    static bool drawLogged = false;
-    if(!drawLogged)
-    {
-        LOGI("Sphere draw started");
-        drawLogged = true;
-    }
-
-    if(sphereProgram == 0)
-    {
-        return;
+        return false;
     }
 
     ArCamera* camera = nullptr;
     ArFrame_acquireCamera(session, sessionFrame, &camera);
+    if(camera == nullptr)
+    {
+        return false;
+    }
 
     ArTrackingState trackingState = AR_TRACKING_STATE_STOPPED;
     ArCamera_getTrackingState(session, camera, &trackingState);
@@ -600,11 +502,6 @@ static void SphereDrawUpdate()
         LOGI("Tracking state: %s", trackingState == AR_TRACKING_STATE_TRACKING ? "TRACKING" : trackingState == AR_TRACKING_STATE_PAUSED   ? "PAUSED" : "STOPPED");
     }
 
-    static float lastView[16];
-    static float lastProjection[16];
-    static int framesSinceTracking = 1000;      // 1000 means "never tracked yet"
-    static const int holdFrames = 15;
-
     if(trackingState == AR_TRACKING_STATE_TRACKING)
     {
         ArCamera_getViewMatrix(session, camera, lastView);
@@ -615,52 +512,14 @@ static void SphereDrawUpdate()
     {
         ++framesSinceTracking;
     }
-
-    const bool drawBall = (framesSinceTracking <= holdFrames);
-
-    static int statFrames = 0;
-    static int statDrawn = 0;
-    ++statFrames;
-    if(drawBall)
-    {
-        ++statDrawn;
-    }
-    if(statFrames == 60)
-    {
-        LOGI("Ball drawn in %d of 60 frames", statDrawn);
-        statFrames = 0;
-        statDrawn = 0;
-    }
-
-    if(drawBall)
-    {
-        const float model[16] = { 1.0f, 0.0f, 0.0f, 0.0f,
-                                  0.0f, 1.0f, 0.0f, 0.0f,
-                                  0.0f, 0.0f, 1.0f, 0.0f,
-                                  0.0f, -0.3f, -1.0f, 1.0f };
-        const float colour[3] = { 1.0f, 0.45f, 0.0f };
-
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-
-        glBindVertexArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-        glUseProgram(sphereProgram);
-        glUniformMatrix4fv(sphereModelLoc, 1, GL_FALSE, model);
-        glUniformMatrix4fv(sphereViewLoc, 1, GL_FALSE, lastView);
-        glUniformMatrix4fv(sphereProjectionLoc, 1, GL_FALSE, lastProjection);
-        glUniform3fv(sphereColourLoc, 1, colour);
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, sphereVertices.data());
-
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(sphereIndices.size()), GL_UNSIGNED_SHORT, sphereIndices.data());
-
-        glDisableVertexAttribArray(0);
-        glDisable(GL_DEPTH_TEST);
-    }
-
     ArCamera_release(camera);
+
+    if(framesSinceTracking > holdFrames)
+    {
+        return false;
+    }
+
+    std::memcpy(view, lastView, sizeof(lastView));
+    std::memcpy(projection, lastProjection, sizeof(lastProjection));
+    return true;
 }

@@ -1,22 +1,24 @@
-import java.io.File
-import java.util.zip.ZipFile
-
 plugins {
     alias(libs.plugins.android.application)
 }
 
 val arcoreVersion = "1.56.0"
-val arcoreLibPath = file("../../../Extern/ARCore/$arcoreVersion")
+val arcoreLibPath = file("../../../Extern/ARCore-natives/$arcoreVersion")
 
+// A separate list of dependencies, used only to download the ARCore AAR for extraction.
+// It is empty until natives("com.google.ar:core:...") adds ARCore below.
 val natives by configurations.creating
 
+// Unzips the AAR (a zip file) and copies everything under its jni/ folder
+// (the native .so libraries) into arcoreLibPath, where CMake looks for them.
 val extractNativeLibraries by tasks.registering(Copy::class) {
     from({ natives.files.map { zipTree(it) } })
     include("jni/**/*")
     into(arcoreLibPath)
 }
 
-// make sure the unpacking happens before CMake runs
+// Makes every CMake build step wait for extractNativeLibraries, so libarcore_sdk_c.so
+// exists before linking. Matches tasks by name prefix; skips Clean tasks.
 tasks.matching {
     (it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake") ||
             it.name.startsWith("generateJsonModel") || it.name.startsWith("externalNativeBuild")) &&
@@ -75,27 +77,13 @@ android {
 }
 
 dependencies {
+    natives("com.google.ar:core:$arcoreVersion") // Pulls ARCore .so file from Google Maven
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
-    implementation("com.google.ar:core:$arcoreVersion")
+    implementation("com.google.ar:core:$arcoreVersion") // Specify the utilisation of the ARCore Library
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
-    natives("com.google.ar:core:$arcoreVersion")
-}
-
-natives.files.forEach { aar ->
-    ZipFile(aar).use { zip ->
-        for (entry in zip.entries().asSequence()) {
-            if (entry.isDirectory || !entry.name.startsWith("jni/")) continue
-            val target = File(arcoreLibPath, entry.name)
-            if (target.exists() && target.length() == entry.size) continue   // already unpacked
-            target.parentFile.mkdirs()
-            zip.getInputStream(entry).use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
-            }
-        }
-    }
 }
