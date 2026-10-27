@@ -20,6 +20,10 @@ include(${REPO_ROOT}/Cmake/GetDependencies.cmake)
 # Every .cpp under Core/Source is compiled into the library.
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS ${CORE_DIR}/Source/*.cpp)
 
+# interactionEngine.cpp is the old Sim:: picking engine. Its picking.hpp is commented out and equipmentDef.hpp now holds the
+# EquipmentScene version, so it cannot compile. Nothing in this build uses it (EquipmentScene does the picking now).
+list(FILTER CORE_SOURCES EXCLUDE REGEX "/interactionEngine\\.cpp$")
+
 # Header folders, listed by hand. A new folder under Core/Header must be added here.
 set(CORE_INCLUDE_DIRS
         ${CORE_DIR}/Header
@@ -41,7 +45,9 @@ embed_assets(${GEN_DIR}/EmbeddedAssets.hpp
         Assets/Json/Equipment.json
         Assets/Models/kettle.obj
         Assets/Models/sock_filter.obj
-        Assets/Models/condensed_milk_tin.obj)
+        Assets/Models/condensed_milk_tin.obj
+        Assets/Models/cup.obj
+        Assets/Models/coffee_liquid.obj)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         ${CORE_INCLUDE_DIRS}
