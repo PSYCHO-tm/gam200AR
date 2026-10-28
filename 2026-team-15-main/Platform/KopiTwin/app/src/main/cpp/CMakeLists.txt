@@ -21,10 +21,9 @@ include(${REPO_ROOT}/Cmake/GetDependencies.cmake)
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS ${CORE_DIR}/Source/*.cpp)
 
 # Two old files must stay out of the library:
-#  - interactionEngine.cpp: old Sim:: picking engine. picking.hpp is commented out and equipmentDef.hpp is now the
-#    EquipmentScene version, so it cannot compile. EquipmentScene does the picking now.
-#  - test-json.cpp: an older copy of DeserializeStream / DeserializePath / SerializeObj. DefinitionLoader.cpp defines the
-#    same three, so linking both gives "duplicate symbol". test-json.hpp is still used, since it only declares them.
+#  - interactionEngine.cpp: old Sim:: picking engine (picking.hpp is commented out, equipmentDef.hpp changed), cannot compile.
+#  - test-json.cpp: older copy of DeserializeStream/DeserializePath/SerializeObj, which DefinitionLoader.cpp also defines
+#    (duplicate symbol at link time). test-json.hpp is still used, since it only declares them.
 list(FILTER CORE_SOURCES EXCLUDE REGEX "/(interactionEngine|test-json)\\.cpp$")
 
 # Header folders, listed by hand. A new folder under Core/Header must be added here.

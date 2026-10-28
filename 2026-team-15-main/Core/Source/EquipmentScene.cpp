@@ -41,6 +41,21 @@ Vector3D EquipmentScene::ColorFor(std::size_t index)
     return palette[index % 3];
 }
 
+// The debug square: 12 cm wide, lying flat just above the plane (+y is the plane's normal).
+MeshData EquipmentScene::MakeMarkerMesh()
+{
+    float const    half = 0.06f;
+    float const    lift = 0.003f;
+    Vector3D const up   = {0.0f, 1.0f, 0.0f};
+    MeshData       marker;
+    marker.vertices = {Vertex{Vector3D{-half, lift, -half}, up, Vector2D{0.0f, 0.0f}},
+                       Vertex{Vector3D{half, lift, -half}, up, Vector2D{1.0f, 0.0f}},
+                       Vertex{Vector3D{half, lift, half}, up, Vector2D{1.0f, 1.0f}},
+                       Vertex{Vector3D{-half, lift, half}, up, Vector2D{0.0f, 1.0f}}};
+    marker.indices  = {0, 1, 2, 0, 2, 3};
+    return marker;
+}
+
 bool EquipmentScene::Init()
 {
     if (loaded)
@@ -88,10 +103,18 @@ bool EquipmentScene::Init()
     }
 
     library = std::move(loadedLibrary);
-    meshes  = std::move(loadedMeshes);
+    localModels.clear();
+    for (EquipmentDef const& def : library.items)
+    {
+        // Row vectors, leftmost applies first: scale, turn, then move to its spot on the anchor.
+        localModels.push_back(
+            Matrix4x4::SRT(Vector3D{def.scale, def.scale, def.scale}, Vector3D{0.0f, def.yawDeg, 0.0f}, def.position));
+    }
+    loadedMeshes.push_back(MakeMarkerMesh()); // always last: its index is library.items.size()
+    meshes = std::move(loadedMeshes);
     Renderer::Get().SetMeshes(meshes);
     loaded = true;
-    LOGI("Equipment loaded: %zu pieces", meshes.size());
+    LOGI("Equipment loaded: %zu pieces", library.items.size());
     return true;
 }
 
@@ -103,20 +126,9 @@ void EquipmentScene::Update(float /*dt*/, InputSnapshot const& input, bool track
         return; // nothing to place, or no trustworthy camera: nothing to place, nothing to pick
     }
 
-    // TEMPORARY until plane placement: the spot the old sphere used, in ARCore world space (metres),
-    // 1 m ahead of where the phone started and 0.3 m down. Placed once, then it stays in the room.
     if (!placed)
     {
-        Matrix4x4 const anchorPose = Matrix4x4::Translate(0.0f, -0.3f, -1.0f);
-        models.clear();
-        for (EquipmentDef const& def : library.items)
-        {
-            // Row vectors, leftmost applies first: scale, turn, move to its spot on the anchor, then the anchor's pose.
-            models.push_back(Matrix4x4::SRT(Vector3D{def.scale, def.scale, def.scale}, Vector3D{0.0f, def.yawDeg, 0.0f},
-                                            def.position) *
-                             anchorPose);
-        }
-        placed = true;
+        return; // still scanning: the pieces are placed (and can be picked) only once ARCore gives an anchor pose
     }
 
     if (input.tapped)
@@ -148,27 +160,95 @@ void EquipmentScene::Update(float /*dt*/, InputSnapshot const& input, bool track
     }
 }
 
+void EquipmentScene::SetPlanes(std::vector<Matrix4x4> const& poses, std::vector<Vector2D> const& extents)
+{
+    // The unit square mesh is 12 cm wide, so it is stretched to the plane's size first, then moved onto the plane.
+    float const markerWidth = 0.12f;
+    planeModels.clear();
+    for (std::size_t i = 0; i < poses.size() && i < extents.size(); ++i)
+    {
+        planeModels.push_back(Matrix4x4::Scale(extents[i].x / markerWidth, 1.0f, extents[i].y / markerWidth) *
+                              poses[i]);
+    }
+}
+
+void EquipmentScene::SetMarker(int state, Matrix4x4 const& pose)
+{
+    markerState = state;
+    markerPose  = pose;
+}
+
+void EquipmentScene::SetAnchorPose(Matrix4x4 const& pose)
+{
+    anchorPose = pose;
+    placed     = true; // the first call is what places the pieces: before it, the scene is "scanning" and draws nothing
+    RefreshModels();   // every call after that follows the anchor, so picking and drawing use the corrected spot
+}
+
+void EquipmentScene::RefreshModels()
+{
+    models.clear();
+    models.reserve(localModels.size());
+    for (Matrix4x4 const& local : localModels)
+    {
+        models.push_back(local * anchorPose); // local -> anchor-local -> ARCore world
+    }
+}
+
 void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
 {
-    if (!loaded || !placed)
+    if (!loaded)
     {
         return;
     }
 
     // Selection becomes a plain tint colour here. The Renderer only knows colours and matrices.
     std::vector<Renderer::MeshDraw> draws;
-    draws.reserve(library.items.size());
+    draws.reserve(library.items.size() + 1);
 
-    for (std::size_t i = 0; i < library.items.size() && i < meshes.size(); ++i)
+    // The detected planes first, as see-through rectangles: the pieces and the debug square are drawn over them.
+    if (meshes.size() > library.items.size())
     {
-        Renderer::MeshDraw draw;
-        draw.meshIndex  = i;
-        draw.model      = models[i];
-        draw.color      = ColorFor(i);
-        draw.tint       = Vector3D{1.0f, 0.85f, 0.2f}; // yellow
-        draw.tintAmount = (selected && *selected == i) ? 0.45f : 0.0f;
-        draws.push_back(draw);
+        for (Matrix4x4 const& planeModel : planeModels)
+        {
+            Renderer::MeshDraw plane;
+            plane.meshIndex = library.items.size();
+            plane.model     = planeModel;
+            plane.color     = Vector3D{0.1f, 0.75f, 0.85f}; // blue-green
+            plane.alpha     = 0.35f;
+            draws.push_back(plane);
+        }
     }
 
+    if (placed)
+    {
+        for (std::size_t i = 0; i < library.items.size() && i < meshes.size(); ++i)
+        {
+            Renderer::MeshDraw draw;
+            draw.meshIndex  = i;
+            draw.model      = models[i];
+            draw.color      = ColorFor(i);
+            draw.tint       = Vector3D{1.0f, 0.85f, 0.2f}; // yellow
+            draw.tintAmount = (selected && *selected == i) ? 0.45f : 0.0f;
+            draws.push_back(draw);
+        }
+    }
+
+    // The debug square: red = a plane the code won't use, yellow = a good plane (holding steady), green = the anchor.
+    if (markerState != 0 && meshes.size() > library.items.size())
+    {
+        Renderer::MeshDraw marker;
+        marker.meshIndex = library.items.size();
+        marker.model     = Matrix4x4::Translate(0.0f, 0.004f, 0.0f) * markerPose; // just above a drawn plane
+        marker.color     = markerState == 1   ? Vector3D{0.9f, 0.2f, 0.2f}
+                           : markerState == 2 ? Vector3D{0.95f, 0.8f, 0.1f}
+                                              : Vector3D{0.2f, 0.8f, 0.3f};
+        draws.push_back(marker);
+    }
+
+    if (draws.empty())
+    {
+        return;
+    }
     Renderer::Get().DrawMeshes(draws, view, projection);
 }

@@ -86,3 +86,41 @@ void ArCameraResize(int width, int height, int rotation);
  * @return  true if both were written, otherwise false (nothing is written).
  */
 bool ArGetCameraMatrices(float* view, float* projection);
+
+/**
+ * @brief   Gives the anchor's latest pose as a 4x4 matrix.
+ * @details ARCore keeps correcting the anchor as it learns the room, so call this every
+ *          frame after ArGetCameraMatrices. The last known pose is kept while tracking
+ *          flickers. Nothing is valid before the anchor exists or after the session is destroyed.
+ * @param[out] matrix  16 floats, in the layout OpenGL uses (column-major).
+ * @return  true if the matrix was written, otherwise false (nothing is written).
+ */
+bool ArGetAnchorPose(float* matrix);
+
+/**
+ * @brief   Says in a few words what the plane placement is doing, for the on-screen text.
+ * @details Scanning (no anchor yet), holding steady on a good plane, or placed. Call it on the drawing thread.
+ * @return  A short text. It stays valid until the next call.
+ */
+const char* ArGetPlacementStatus();
+
+/**
+ * @brief   Gives the spot to draw the small debug square: where the middle of the screen touches a plane.
+ * @details While scanning it follows the ray (state 1 = a plane that cannot be used, 2 = a good plane, held steady
+ *          before placing). Once the anchor exists it sits on the anchor (state 3), so you can see where the anchor is
+ *          compared with the pieces. The square lies flat on the plane: +y is the plane's normal.
+ * @param[out] matrix  16 floats, in the layout OpenGL uses (column-major). Not written when 0 is returned.
+ * @return  0 = draw nothing, 1 = plane not usable, 2 = good plane, 3 = placed.
+ */
+int ArGetPlacementMarker(float* matrix);
+
+/**
+ * @brief   Gives the planes worth drawing as a see-through rectangle (floor or table, tracked right now, with a size).
+ * @details Each plane comes as its centre pose (+y is the plane's normal) and its size along its own x and z.
+ *          Empty when ARCore is not tracking or has found nothing usable.
+ * @param[out] matrices  maxCount * 16 floats, each in the layout OpenGL uses (column-major).
+ * @param[out] extents   maxCount * 2 floats: the size along the plane's x, then z, in metres.
+ * @param[in]  maxCount  How many planes the caller has room for.
+ * @return  How many planes were written.
+ */
+int ArGetPlanes(float* matrices, float* extents, int maxCount);

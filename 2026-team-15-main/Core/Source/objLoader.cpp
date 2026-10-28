@@ -1,4 +1,4 @@
-#include "objLoader.hpp"
+#include "ObjLoader.hpp"
 
 #include <array>
 #include <cstdint>

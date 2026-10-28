@@ -72,6 +72,8 @@ void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& v
 
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND); // only draws with alpha below 1 are see-through; everything else is unchanged
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     litShader.Use();
 
     // Row vectors, leftmost applies first: world -> view, then view -> clip.
@@ -95,11 +97,13 @@ void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& v
         litShader.SetVec3("uColor", color);
         litShader.SetVec3("uTint", tint);
         litShader.SetFloat("uTintAmount", item.tintAmount);
+        litShader.SetFloat("uAlpha", item.alpha);
 
         meshes[item.meshIndex].Draw();
     }
 
     glBindVertexArray(0);
     glUseProgram(0);
+    glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
 }

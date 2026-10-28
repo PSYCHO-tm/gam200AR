@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity() {
             FrameLayout.LayoutParams.WRAP_CONTENT
         )
         //infoParams.leftMargin = 300
-        infoParams.topMargin = 300
+        infoParams.topMargin = 450
 
         statsText = TextView(this).apply {
             textSize = 16f

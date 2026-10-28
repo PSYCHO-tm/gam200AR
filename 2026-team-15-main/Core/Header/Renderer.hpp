@@ -24,6 +24,7 @@ public:
         Vector3D    color{1.0f, 1.0f, 1.0f};
         Vector3D    tint{0.0f, 0.0f, 0.0f};
         float       tintAmount = 0.0f;      // 0 = plain colour, 1 = fully the tint colour
+        float       alpha = 1.0f;           // 1 = solid, below 1 = see-through (blended with what is behind it)
     };
 
     static Renderer& Get();

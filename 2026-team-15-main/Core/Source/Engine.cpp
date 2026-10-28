@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include <GLES3/gl3.h>
 
@@ -103,10 +104,39 @@ void Core::Render()
     gTracking = ArGetCameraMatrices(view, projection);
     if (!gTracking)
     {
+        EquipmentScene::Get().SetMarker(0, Matrix4x4{});
+        EquipmentScene::Get().SetPlanes({}, {});
         return;
     }
     gView       = FromGL(view);
     gProjection = FromGL(projection);
+
+    // The pieces follow the anchor: ARCore keeps correcting its pose, and the scene re-places them on it.
+    float anchorMatrix[16];
+    if (ArGetAnchorPose(anchorMatrix))
+    {
+        EquipmentScene::Get().SetAnchorPose(FromGL(anchorMatrix));
+    }
+
+    // The small debug square: where the middle of the screen touches a plane (and, once placed, where the anchor is).
+    float markerMatrix[16] = {};
+    int   markerState      = ArGetPlacementMarker(markerMatrix);
+    EquipmentScene::Get().SetMarker(markerState, FromGL(markerMatrix));
+
+    // The planes ARCore is tracking, each drawn as a see-through rectangle.
+    constexpr int maxPlanes = 8;
+    float         planeMatrices[maxPlanes * 16] = {};
+    float         planeExtents[maxPlanes * 2]   = {};
+    int const     planeCount                    = ArGetPlanes(planeMatrices, planeExtents, maxPlanes);
+    std::vector<Matrix4x4> planePoses;
+    std::vector<Vector2D>  planeSizes;
+    for (int i = 0; i < planeCount; ++i)
+    {
+        planePoses.push_back(FromGL(planeMatrices + i * 16));
+        planeSizes.push_back(Vector2D{planeExtents[i * 2], planeExtents[i * 2 + 1]});
+    }
+    EquipmentScene::Get().SetPlanes(planePoses, planeSizes);
+
     EquipmentScene::Get().Draw(gView, gProjection);
 }
 
@@ -121,8 +151,8 @@ void Core::OnResume()
 UI32 Core::GetOverlayText(char* buf, UI32 size)
 {
     UI32 n = std::snprintf(buf, size,
-                           "frame %u, dt = %.2f ms, fps = %.1f",
-                           frameCount, dt * 1000.0f, frameRate);
+                           "%s\nframe %u, dt = %.2f ms, fps = %.1f",
+                           ArGetPlacementStatus(), frameCount, dt * 1000.0f, frameRate);
     if (n < size)
         n += Profiler::Format(buf + n, size - n);
 
