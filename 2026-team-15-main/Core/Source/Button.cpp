@@ -24,17 +24,17 @@ bool Button2D::Contains(float x, float y) const
 
 void Button2D::Update(InputSnapshot const& input)
 {
-    const InputState& s = input.is;
+    const InputState& s = input.Is;
 
-    if (s.ptrCancelled)
+    if (s.PtrCancelled)
         pressed = false;
 
-    if (s.ptrPressed)
-        pressed = Contains(s.pressX, s.pressY);
+    if (s.PtrPressed)
+        pressed = Contains(s.PressX, s.PressY);
 
-    if (s.ptrReleased && !s.ptrCancelled)
+    if (s.PtrReleased && !s.PtrCancelled)
     {
-        const bool clicked = pressed && Contains(s.px, s.py);
+        const bool clicked = pressed && Contains(s.Px, s.Py);
         pressed = false;
         if (clicked && function) 
         {

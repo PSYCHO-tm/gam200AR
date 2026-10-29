@@ -127,9 +127,9 @@ namespace Ecs{
         ClearOrders();
         current = scenarioName;
 
-        for (auto const& order : sc->second.Orders) {
-            for (int i = 0; i < order.Count; ++i) {
-                auto e = SpawnInstance(scene, db, kDrinks, order.Drink, Json::object(), errs);
+        for (auto const& o : sc->second.Orders) {
+            for (int i = 0; i < o.Count; ++i) {
+                auto e = SpawnInstance(scene, db, kDrinks, o.Drink, Json::object(), errs);
                 if (!e) {    // undo this run completely
                     ClearOrders();
                     current.clear();

@@ -24,6 +24,9 @@ namespace Ecs{
         else if (kind == kIngredients) {
             table = &db.ingredients;
         }
+        else if (kind == kEquipment) { 
+            table = &db.equipment; 
+        }
         else {
             errs.push_back("SpawnInstance: unknown definition kind '" + kind + "'");
             return std::nullopt;

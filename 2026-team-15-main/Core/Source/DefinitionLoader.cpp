@@ -261,6 +261,7 @@ namespace Ecs{
  
         tmp.drinks = Load_Table<Json> (folder + "/Drinks.json", "DRINKS", local);
         tmp.ingredients = Load_Table<Json> (folder + "/Ingredients.json", "INGREDIENTS", local);
+        tmp.equipment = Load_Table<Json> (folder + "/Equipment.json", "EQUIPMENT", local);
         tmp.recipes = Load_Table<RecipeDef> (folder + "/Recipes.json", "RECIPES", local);
         tmp.scenarios = Load_Table<ScenarioDef> (folder + "/Scenarios.json", "SCENARIO", local);
         tmp.grading = Load_Table<std::vector<GradeTier>> (folder + "/Grading.json", "GRADING", local);
@@ -272,6 +273,7 @@ namespace Ecs{
                 //Deep check of each entity definition
                 for (auto const& [id, def] : tmp.drinks)      check(def, "Drinks.json: " + id, local);
                 for (auto const& [id, def] : tmp.ingredients) check(def, "Ingredients.json: " + id, local);
+                for (auto const& [id, def] : tmp.equipment)   check(def, "Equipment.json: " + id, local);
             }
 
             ErrorChecker another = Validate(tmp);   
@@ -324,24 +326,50 @@ namespace Ecs{
     }
 }
 
+TextReader textReader;
+
+void SetTextReader(TextReader reader)
+{
+    textReader = std::move(reader);
+}
+
 /*
     [READING] Making a Json file (delegated) by passing a file name
 */
     std::optional<Json> DeserializePath(std::string const& filepath){
-    std::ifstream ifs(filepath);
-    if(!ifs.is_open()){
+    if (textReader)                                    // Android: text comes from the embedded table
+    {
+        std::optional<std::string> text = textReader(filepath);
+        if (!text)
+        {
+            std::cerr << " [DeserializePath] No text found for " << filepath << '\n';
+            return std::nullopt;
+        }
+        std::istringstream iss(*text);
+        return DeserializeStream(iss);
+    }
+
+    std::ifstream ifs(filepath);                       // otherwise read a real file, as before
+    if (!ifs.is_open())
+    {
         std::cerr << " [DeserializePath] File " << filepath << " passed to read cannot be opened\n";
         return std::nullopt;
     }
-
     return DeserializeStream(ifs);
 }
+    
 
 
     /*
         [WRITING] Takes a Json object and transforms it into a readable Json string
     */
-    bool SerializeObj(Json const& obj, std::string const& filepath, int indent){
+    bool SerializeObj(Json const& obj, std::string const& filepath, int indent) {
+    // Enforce .json extension check
+    if (std::filesystem::path(filepath).extension() != ".json") {
+        std::cerr << "[SerializeObj] Error: Invalid file extension. Only .json is allowed.\n";
+        return false;
+    }
+
     std::ofstream file(filepath);
     if (!file.is_open()) {
         std::cerr << " [SerializeObj] File " << filepath << " cannot be opened\n";
@@ -351,6 +379,7 @@ namespace Ecs{
     file.flush();
     return file.good();
 }
+
 
 /*
     [RETRIEVING] Passing values from a Json file to individual drink objects, accepts different params

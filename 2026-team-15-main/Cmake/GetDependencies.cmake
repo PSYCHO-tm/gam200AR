@@ -1,6 +1,6 @@
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
-set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON) # FetchContent will not run git fetch, checkout, stash. Prevent hidden stashing
 
 # Define REPO_ROOT, Android build does this automatically but desktop doesn't
 if (NOT DEFINED REPO_ROOT)
@@ -9,6 +9,14 @@ endif()
 
 # --- SDL 3 ---
 macro(get_sdl3)
+    # Linux/WSL ONLY (the CI build). Android must keep SDL as a shared lib for SDLActivity.
+    if(UNIX AND NOT ANDROID)
+        set(SDL_UNIX_CONSOLE_BUILD ON  CACHE BOOL "" FORCE) # no X11/Wayland dev libs needed
+        set(SDL_TESTS              OFF CACHE BOOL "" FORCE) # faster build, doesn't build SDL own test
+        set(SDL_EXAMPLES           OFF CACHE BOOL "" FORCE) # faster build, doesn't build SDL own sample
+        set(SDL_TEST_LIBRARY       OFF CACHE BOOL "" FORCE) # faster build, doesn't build SDL helper library
+    endif()
+
     FetchContent_Declare(
         SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -81,6 +89,7 @@ macro(get_glew)
         GIT_REPOSITORY https://github.com/Perlmint/glew-cmake.git
         GIT_TAG        glew-cmake-2.2.0
         GIT_SHALLOW    TRUE
+        GIT_SUBMODULES ""
         SOURCE_DIR     ${REPO_ROOT}/Extern/glew
     )
 

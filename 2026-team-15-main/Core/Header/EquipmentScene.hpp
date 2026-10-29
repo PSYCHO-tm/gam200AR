@@ -6,7 +6,7 @@
 #include "Geometry.hpp"
 #include "Input.hpp"
 #include "Matrix.hpp"
-#include "equipmentDef.hpp"
+#include "EquipmentDef.hpp"
 
 // The equipment you see in AR: loads it, keeps it still in the room, selects it when you tap it, and draws it.
 // Everything runs on the GL thread, called from Core (Init / Update / Render), so nothing here needs a lock.
@@ -20,9 +20,9 @@ public:
     EquipmentScene(EquipmentScene const&)            = delete;
     EquipmentScene& operator=(EquipmentScene const&) = delete;
 
-    // Once per GL context. Reads the Equipment.json and the meshes that CMake baked into the app.
-    // Returns false (and logs why) if anything is missing or invalid.
-    bool Init();
+    // Once per GL context. Takes the equipment list built from the ECS entities, and reads the meshes that CMake baked
+    // into the app. Returns false (and logs why) if anything is missing or invalid.
+    bool Init(EquipmentLibrary loadedLibrary);
 
     // Once per frame. 'view' and 'projection' are the camera the player is looking through (the last frame drawn),
     // so a tap selects exactly what is on screen. 'tracking' is false while ARCore cannot place anything.

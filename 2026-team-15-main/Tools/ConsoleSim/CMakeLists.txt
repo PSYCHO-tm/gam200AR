@@ -26,9 +26,9 @@ add_executable(console_sim
 find_package(Threads REQUIRED) # guided mode reads the keyboard on its own thread
 target_link_libraries(console_sim PRIVATE Threads::Threads)
 
-# Core/Header      -> #include "Simulation/simulation.hpp"
-# Assets/Json      -> only needed while json.hpp has not been moved to Core/Header/nlohmann/
-target_include_directories(console_sim PRIVATE ${REPO_ROOT}/Core/Header ${REPO_ROOT}/Assets/Json)
+# Core/Header                  -> #include "Simulation/simulation.hpp"
+# Extern/NlohmannJson/include  -> #include <nlohmann/json.hpp>
+target_include_directories(console_sim PRIVATE ${REPO_ROOT}/Core/Header ${REPO_ROOT}/Extern/NlohmannJson/include)
 
 # Where the demo looks for the JSON files when you do not pass --assets
 target_compile_definitions(console_sim PRIVATE KOPI_ASSETS_DIR="${REPO_ROOT}/Assets/Json")

@@ -1,6 +1,6 @@
 #include "Renderer.hpp"
 
-#include <GLES3/gl3.h>
+#include "GlApi.hpp"
 
 #include <utility>
 

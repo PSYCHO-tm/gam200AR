@@ -26,6 +26,7 @@ add_executable(desktop desktop-main.cpp)
 target_compile_features(desktop PRIVATE cxx_std_20)
 
 target_link_libraries(desktop PRIVATE
+    ci_core
     SDL3::SDL3
     libglew_static
     OpenGL::GL
@@ -42,3 +43,10 @@ set_target_properties(desktop PROPERTIES
 )
 # Only affects a generated .sln (harmless in Open Folder mode).
 set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT desktop)
+
+add_custom_command(TARGET desktop POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/Assets/Json $<TARGET_FILE_DIR:desktop>/Json
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/Assets/Audio $<TARGET_FILE_DIR:desktop>/Audio
+)

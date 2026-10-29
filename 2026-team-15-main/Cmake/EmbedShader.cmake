@@ -6,7 +6,7 @@
 function(embed_shader INPUT VAR_NAME OUTPUT)
     file(READ "${INPUT}" SHADER_SOURCE)
     file(WRITE "${OUTPUT}"
-        "// Generated from ${INPUT}\n"
+        #"// Generated from ${INPUT}\n"
         "// Do not edit: edit the shader file instead.\n"
         "#pragma once\n"
         "inline constexpr const char* ${VAR_NAME} = R\"GLSL(${SHADER_SOURCE})GLSL\";\n")

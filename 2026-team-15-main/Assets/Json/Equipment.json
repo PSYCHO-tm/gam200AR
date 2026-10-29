@@ -1,100 +1,75 @@
 {
   "EQUIPMENT": {
     "Kettle": {
-      "Name": "Kettle",
-      "Mesh": "Assets/Models/kettle.obj",
-      "Position": [
-        -0.1,
-        0.0,
-        0.0
-      ],
-      "YawDeg": 0,
-      "Scale": 1.0,
-      "Interactions": {
-        "pour_water": {
-          "Label": "Pour hot water",
-          "Ingredient": "water",
-          "Quantity": 220,
-          "Units": "g"
+      "Components": {
+        "Name":        { "Value": "Kettle" },
+        "MeshRef":     { "Path": "Assets/Models/kettle.obj" },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [-0.15, 0, 0] },
+        "Props": {
+          "Interactions": {
+            "pour_water": { "Label": "Pour hot water", "Ingredient": "water", "Quantity": 220, "Units": "g", "Attributes": { "State": "hot" } }
+          },
+          "Visual": {},
+          "Audio": {}
         }
-      },
-      "Visual": {},
-      "Audio": {}
+      }
     },
+
     "SockFilter": {
-      "Name": "Sock Filter",
-      "Mesh": "Assets/Models/sock_filter.obj",
-      "Position": [
-        -0.1,
-        0.087,
-        0.0
-      ],
-      "YawDeg": 0,
-      "Scale": 1.0,
-      "Interactions": {
-        "add_grounds": {
-          "Label": "Add coffee grounds",
-          "Ingredient": "coffee_beans",
-          "Quantity": 18,
-          "Units": "g"
-        },
-        "serve": {
-          "Label": "Serve",
-          "Quantity": 1,
-          "Units": "cup"
+      "Components": {
+        "Name":        { "Value": "Sock Filter" },
+        "MeshRef":     { "Path": "Assets/Models/sock_filter.obj" },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [0.15, 0, 0] },
+        "Props": {
+          "Interactions": {
+            "add_grounds": { "Label": "Add coffee grounds", "Ingredient": "coffee_beans", "Quantity": 18, "Units": "g",  "Attributes": { "State": "ground" } },
+            "serve":       { "Label": "Serve", "Quantity": 1, "Units": "cup" }
+          },
+          "Visual": {},
+          "Audio": {}
         }
-      },
-      "Visual": {},
-      "Audio": {}
+      }
     },
+
     "CondensedMilkTin": {
-      "Name": "Condensed Milk Tin",
-      "Mesh": "Assets/Models/condensed_milk_tin.obj",
-      "Position": [
-        0.0,
-        0.0,
-        0.12
-      ],
-      "YawDeg": 0,
-      "Scale": 1.0,
-      "Interactions": {
-        "pour_condensed_milk": {
-          "Label": "Add condensed milk",
-          "Ingredient": "condensed_milk",
-          "Quantity": 2,
-          "Units": "tablespoon(s)"
+      "Components": {
+        "Name":        { "Value": "Condensed Milk Tin" },
+        "MeshRef":     { "Path": "Assets/Models/condensed_milk_tin.obj" },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [0, 0, 0.12] },
+        "Props": {
+          "Interactions": {
+            "pour_condensed_milk": { "Label": "Add condensed milk", "Ingredient": "condensed_milk", "Quantity": 2, "Units": "tablespoon(s)", "Attributes": { "Sweetened": "Yes" } }
+          },
+          "Visual": {},
+          "Audio": {}
         }
-      },
-      "Visual": {},
-      "Audio": {}
+      }
     },
+
     "Cup": {
-      "Name": "Cup",
-      "Mesh": "Assets/Models/cup.obj",
-      "Position": [
-        0.14,
-        0.0,
-        0.0
-      ],
-      "YawDeg": 0,
-      "Scale": 1.0,
-      "Interactions": {},
-      "Visual": {},
-      "Audio": {}
+      "Components": {
+        "Name":        { "Value": "Cup" },
+        "MeshRef":     { "Path": "Assets/Models/cup.obj" },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [0.14, 0, 0] },
+        "Props": {
+          "Interactions": {},
+          "Visual": {},
+          "Audio": {}
+        }
+      }
     },
+
     "CoffeeLiquid": {
-      "Name": "Coffee",
-      "Mesh": "Assets/Models/coffee_liquid.obj",
-      "Position": [
-        0.14,
-        0.006,
-        0.0
-      ],
-      "YawDeg": 0,
-      "Scale": 0.8,
-      "Interactions": {},
-      "Visual": {},
-      "Audio": {}
+      "Components": {
+        "Name":        { "Value": "Coffee" },
+        "MeshRef":     { "Path": "Assets/Models/coffee_liquid.obj" },
+        "Transform3D": { "scale": [0.8, 0.8, 0.8], "rotation": [0, 0, 0], "position": [0.14, 0.006, 0] },
+        "Props": {
+          "Interactions": {},
+          "Visual": {},
+          "Audio": {}
+        }
+      }
     }
   }
 }

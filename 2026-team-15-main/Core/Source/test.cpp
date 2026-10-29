@@ -7,11 +7,9 @@ namespace TestCore
 {
     std::string OnTouch()
     {
-        InputSnapshot const& snapshot = Core::GetInput().getSnapshot();
-        //InputState const& state = Core::GetInput().getState();
-        return "Tapped: " + std::to_string(snapshot.tapped) +
-               " X Coords: " + std::to_string(snapshot.is.px) +
-               " Y Coords: " + std::to_string(snapshot.is.py) +
-               " Held Time: " + std::to_string(snapshot.heldTime);
+        InputSnapshot const& snapshot = Core::GetInput().GetSnapshot();
+        return "Taps: " + std::to_string(snapshot.FrameTapCount) +
+               " Coords: " + std::to_string(snapshot.Is.Px) + ", " + std::to_string(snapshot.Is.Py) +
+               " Held: " + std::to_string(snapshot.FrameHeldTime);
     }
 }

@@ -13,8 +13,8 @@ namespace Profiler
 
     struct SectionStats
     {
-        const char* name;
-        F32 lastMs, avgMs, minMs, maxMs;
+        const char* Name;
+        F32 LastMs, AvgMs, MinMs, MaxMs;
     };
 
     void Init();                       // registers section 0 = "Frame"
@@ -29,6 +29,9 @@ namespace Profiler
 
     // Writes one line per section into buf. Returns characters written.
     UI32 Format(char* buf, UI32 size);
+
+    // Logs stats in build/log/___.txt
+    void LogReport();
 }
 
 #ifdef PROFILER_ENABLED

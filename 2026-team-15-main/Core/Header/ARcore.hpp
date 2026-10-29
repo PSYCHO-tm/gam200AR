@@ -58,18 +58,25 @@ void ArSessionDestroy();
 void ArCameraInit();
 
 /**
- * @brief   Runs once per frame: updates ARCore, then draws the camera picture.
- * @details Tells ARCore about the camera texture and screen size if it does not
- *          know them yet, asks ARCore for the newest frame, then draws the camera
- *          picture. The equipment is drawn after this by Core::Render. If the
- *          update fails, nothing is drawn that frame.
+ * @brief   Runs once per frame: asks ARCore for its newest frame and refreshes the plane list.
+ * @details Tells ARCore about the camera texture and screen size if it does not know them yet,
+ *          then updates the session. Call this before ArGetCameraMatrices, ArGetAnchorPose,
+ *          ArGetPlacementMarker and ArGetPlanes, so they all read the same frame. If the update
+ *          fails, no planes are reported and ArCameraDraw draws nothing that frame.
+ */
+void ArCameraUpdate();
+
+/**
+ * @brief   Clears the screen and draws the camera picture.
+ * @details This is the back layer, drawn before the equipment by Core::Render. It shows the frame
+ *          that ArCameraUpdate fetched this frame. If that update failed, only the clear happens.
  */
 void ArCameraDraw();
 
 /**
  * @brief   Remembers the new screen size and rotation for ARCore.
  * @details Called when the phone's width, height or rotation changes.
- *          ARCore is told later, from ArCameraDraw.
+ *          ARCore is told later, from ArCameraUpdate.
  * @param[in] width     Screen width in pixels.
  * @param[in] height    Screen height in pixels.
  * @param[in] rotation  Screen rotation: 0, 1, 2 or 3 (Android Surface.ROTATION_*).
@@ -78,7 +85,7 @@ void ArCameraResize(int width, int height, int rotation);
 
 /**
  * @brief   Gives the phone camera's view and projection matrices from the latest frame.
- * @details Call after ArCameraDraw. Only valid while ARCore is tracking, and for a
+ * @details Call after ArCameraUpdate. Only valid while ARCore is tracking, and for a
  *          few frames after it drops, because only then can the phone's position
  *          be trusted.
  * @param[out] view        16 floats, in the layout OpenGL uses (column-major).

@@ -5,7 +5,7 @@
 
 #include <string>
 #include <vector>
-
+#include <map>
 #include "Collider.hpp"
 #include "Vector.hpp"
 
@@ -16,6 +16,7 @@ struct InteractionDef
     std::string ingredient; // ingredient id from Ingredients.json, e.g. "water"
     float       quantity = 0.0f;
     std::string units;
+    std::map<std::string, std::string> attributes; // e.g. { "State": "hot" }, passed to the cups
 };
 
 struct EquipmentDef

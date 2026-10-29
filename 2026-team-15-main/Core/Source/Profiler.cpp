@@ -2,9 +2,11 @@
 // Created by Zac Y on 18/10/2026.
 //
 #include "Profiler.hpp"
+#include "log.hpp"
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <iomanip>
 
 namespace Profiler
 {
@@ -59,19 +61,19 @@ namespace Profiler
         SectionStats s{ "?", 0, 0, 0, 0 };
         if (id >= count || filled == 0) return s;
 
-        s.name   = names[id];
-        s.lastMs = history[id][(head + kHistory - 1) % kHistory];
-        s.minMs  = history[id][0];
-        s.maxMs  = history[id][0];
+        s.Name   = names[id];
+        s.LastMs = history[id][(head + kHistory - 1) % kHistory];
+        s.MinMs  = history[id][0];
+        s.MaxMs  = history[id][0];
         F32 sum = 0.f;
         for (UI32 f = 0; f < filled; ++f)
         {
             const F32 v = history[id][f];
             sum += v;
-            if (v < s.minMs) s.minMs = v;
-            if (v > s.maxMs) s.maxMs = v;
+            if (v < s.MinMs) s.MinMs = v;
+            if (v > s.MaxMs) s.MaxMs = v;
         }
-        s.avgMs = sum / static_cast<F32>(filled);
+        s.AvgMs = sum / static_cast<F32>(filled);
         return s;
     }
 
@@ -82,10 +84,21 @@ namespace Profiler
         {
             const SectionStats s = GetStats(i);
             const int n = std::snprintf(buf + used, size - used,
-                                        "%-12s %5.2f avg %5.2f max\n", s.name, s.avgMs, s.maxMs);
+                                        "%-12s %5.2f avg %5.2f max\n", s.Name, s.AvgMs, s.MaxMs);
             if (n < 0 || static_cast<UI32>(n) >= size - used) break;
             used += static_cast<UI32>(n);
         }
         return used;
     }
+
+    void LogReport()
+   {
+       for (UI32 i = 0; i < count; ++i)
+       {
+           const SectionStats s = GetStats(i);
+           if (s.LastMs == 0 && s.MaxMs == 0) continue; // skips sections not measured yet
+           LOG_INFO("PROFILE " << s.Name << std::fixed << std::setprecision(3) << " last=" << s.LastMs
+                    << "ms avg=" << s.AvgMs << "ms max=" << s.MaxMs << "ms");
+       }
+   }
 }

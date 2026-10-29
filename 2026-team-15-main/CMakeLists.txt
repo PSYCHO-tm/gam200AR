@@ -3,6 +3,8 @@ project(KopiTwin LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Enable compilation database generation for clang-tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # MEM LEAKS, applies to the library AND the tests
 if (NOT MSVC)
@@ -19,4 +21,7 @@ if(WIN32)
 endif()
 
 enable_testing()
-add_subdirectory(Tests) # Cmake opens Tests/CMakeLists.txt
+# Any subdirectory beyond this line are registered with ctest via add_test() / catch_discover_tests() calls 
+
+add_subdirectory(Tests) # defines AllTests and register tests (ctest runs this)
+add_subdirectory(Tools/ConsoleSim) # defines ConsoleSim

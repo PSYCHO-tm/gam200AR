@@ -1,9 +1,16 @@
+/* ======================================================================================
+Main Author
+Name:           Zachary Yee
+Course:         IMGD
+Digipen ID:     zachary.y
+====================================================================================== */
 #include <cmath>
 #include <iostream>
 #include <string>
 #include <GL/glew.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include "Engine.hpp"
 
 namespace TestRender
 {
@@ -67,13 +74,13 @@ void main()
 	// Helpers
 	// ---------------------------------------------------------------------------
 
-	static void checkGlError(const char* op)
+	static void CheckGlError(const char* op)
 	{
 		for (GLenum err = glGetError(); err != GL_NO_ERROR; err = glGetError())
 			std::cerr << "after " << op << "() glError: 0x" << std::hex << err << std::dec << '\n';
 	}
 
-	static GLuint compileShader(GLenum type, const char* src)
+	static GLuint CompileShader(GLenum type, const char* src)
 	{
 		GLuint shader = glCreateShader(type);
 		if (!shader) return 0;
@@ -96,11 +103,11 @@ void main()
 		return shader;
 	}
 
-	static GLuint createProgram(const char* vertSrc, const char* fragSrc)
+	static GLuint CreateProgram(const char* vertSrc, const char* fragSrc)
 	{
-		GLuint vs = compileShader(GL_VERTEX_SHADER, vertSrc);
+		GLuint vs = CompileShader(GL_VERTEX_SHADER, vertSrc);
 		if (!vs) return 0;
-		GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragSrc);
+		GLuint fs = CompileShader(GL_FRAGMENT_SHADER, fragSrc);
 		if (!fs)
 		{
 			glDeleteShader(vs);
@@ -141,7 +148,7 @@ void main()
 		const GLubyte* version = glGetString(GL_VERSION);
 		std::cout << "GL Version = " << (version ? reinterpret_cast<const char*>(version) : "Unknown") << '\n';
 
-		programID = createProgram(vertexShader, fragmentShader);
+		programID = CreateProgram(vertexShader, fragmentShader);
 		if (!programID)
 		{
 			std::cerr << "Could not create shader program.\n";
@@ -169,21 +176,29 @@ void main()
 		glVertexArrayAttribFormat(vao, 1, 3, GL_FLOAT, GL_FALSE, 0);
 		glVertexArrayAttribBinding(vao, 1, 1);
 
-		checkGlError("GraphicsInit");
+		CheckGlError("GraphicsInit");
 		return true;
 	}
 
 	void GraphicsResize(int width, int height) { glViewport(0, 0, width, height); }
 
-	void GraphicsRender()
+	constexpr float angularSpeed = 1.0471976f;
+	void GraphicsRender(F32 dt)
 	{
+		static F32 angleRad = 0.0f; // current angle in radians
+
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glUseProgram(programID);
 
-		float radian = degree++ / 57.2957795f;
-		glUniform1f(uRadianAngle, radian);
+		//float radian = degree++ / 57.2957795f;
+		angleRad += angularSpeed * dt;
+		// Keep the angle bounded to avoid float precision loss over long runtimes
+		constexpr float twoPi = 6.28318530718f;
+		if (angleRad >= twoPi) angleRad -= twoPi;
+
+		glUniform1f(uRadianAngle, angleRad);
 
 		glBindVertexArray(vao);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -200,65 +215,89 @@ void main()
 	}
 }
 
+namespace TestAudio
+{
+	void PrintAudio(InputSnapshot const& s)
+	{
+		auto const& keys = s.Is.Keys.Pressed;
+
+		for (int i = 0; i < 8; ++i)
+		{
+            if (keys.test(SDL_SCANCODE_1 + i))
+                std::cout << '[' << i + 1 << "] Sound effect requested\n";
+		}
+
+		if (keys.test(SDL_SCANCODE_0))
+            std::cout << "[0] All sound effects stopped\n";
+	}
+}
+
 int main(int, char**)
 {
-	if (!SDL_Init(SDL_INIT_VIDEO))
+	SDL_Window* window = nullptr;
+	SDL_GLContext glContext = nullptr;
+	// Init validation checks
 	{
-		std::cerr << "Failed to initialize SDL: " << SDL_GetError() << '\n';
-		return -1;
+		if (!SDL_Init(SDL_INIT_VIDEO))
+		{
+			std::cerr << "Failed to initialize SDL: " << SDL_GetError() << '\n';
+			return -1;
+		}
+
+		// Request GL 4.3 core (the desktop equivalent of the ES 3.0 target)
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+		window = SDL_CreateWindow("KopiTwin Windows Shell", 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+		if (!window)
+		{
+			std::cerr << "Failed to create SDL window: " << SDL_GetError() << '\n';
+			SDL_Quit();
+			return -1;
+		}
+
+		glContext = SDL_GL_CreateContext(window);
+		if (!glContext)
+		{
+			std::cerr << "Failed to create GL context: " << SDL_GetError() << '\n';
+			SDL_DestroyWindow(window);
+			SDL_Quit();
+			return -1;
+		}
+		SDL_GL_MakeCurrent(window, glContext);
+		SDL_GL_SetSwapInterval(1); // vsync
+
+		glewExperimental  = GL_TRUE;
+		GLenum glewResult = glewInit();
+		if (glewResult != GLEW_OK)
+		{
+			std::cerr << "Failed to initialize GLEW: " << reinterpret_cast<const char*>(glewGetErrorString(glewResult))
+					  << '\n';
+			SDL_GL_DestroyContext(glContext);
+			SDL_DestroyWindow(window);
+			SDL_Quit();
+			return -1;
+		}
+		glGetError(); // glewInit can leave a spurious GL_INVALID_ENUM on core profiles
+
+		int w = 0, h = 0;
+		SDL_GetWindowSizeInPixels(window, &w, &h);
+		TestRender::GraphicsResize(w, h);
+
+		if (!TestRender::GraphicsInit())
+		{
+			TestRender::GraphicsCleanup();
+			SDL_GL_DestroyContext(glContext);
+			SDL_DestroyWindow(window);
+			SDL_Quit();
+			return -1;
+		}
 	}
-
-	// Request GL 4.3 core (the desktop equivalent of the ES 3.0 target)
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-
-	SDL_Window* window = SDL_CreateWindow("KopiTwin Windows Shell", 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-	if (!window)
-	{
-		std::cerr << "Failed to create SDL window: " << SDL_GetError() << '\n';
-		SDL_Quit();
-		return -1;
-	}
-
-	SDL_GLContext glContext = SDL_GL_CreateContext(window);
-	if (!glContext)
-	{
-		std::cerr << "Failed to create GL context: " << SDL_GetError() << '\n';
-		SDL_DestroyWindow(window);
-		SDL_Quit();
-		return -1;
-	}
-	SDL_GL_MakeCurrent(window, glContext);
-	SDL_GL_SetSwapInterval(1); // vsync
-
-	glewExperimental  = GL_TRUE;
-	GLenum glewResult = glewInit();
-	if (glewResult != GLEW_OK)
-	{
-		std::cerr << "Failed to initialize GLEW: " << reinterpret_cast<const char*>(glewGetErrorString(glewResult))
-				  << '\n';
-		SDL_GL_DestroyContext(glContext);
-		SDL_DestroyWindow(window);
-		SDL_Quit();
-		return -1;
-	}
-	glGetError(); // glewInit can leave a spurious GL_INVALID_ENUM on core profiles
-
-	int w = 0, h = 0;
-	SDL_GetWindowSizeInPixels(window, &w, &h);
-	TestRender::GraphicsResize(w, h);
-
-	if (!TestRender::GraphicsInit())
-	{
-		TestRender::GraphicsCleanup();
-		SDL_GL_DestroyContext(glContext);
-		SDL_DestroyWindow(window);
-		SDL_Quit();
-		return -1;
-	}
-
+	
+	// Code reaches here means edge cases checks passed. Windows shell loop begins.
+	Core::Init();
 	bool running = true;
 	while (running)
 	{
@@ -274,18 +313,27 @@ int main(int, char**)
 					TestRender::GraphicsResize(e.window.data1, e.window.data2);
 					break;
 				case SDL_EVENT_KEY_DOWN:
-					if (e.key.key == SDLK_ESCAPE) running = false;
+				case SDL_EVENT_KEY_UP:
+					if (e.key.down && e.key.key == SDLK_ESCAPE) running = false;
+					Core::mInput.SetKey(static_cast<KeyId>(e.key.scancode), e.key.down);
+					break;
+				case SDL_EVENT_WINDOW_FOCUS_LOST:
+					Core::mInput.Reset();
 					break;
 				default:
 					break;
 			}
 		}
 
-		TestRender::GraphicsRender();
+		Core::Update();
+		TestAudio::PrintAudio(Core::mInput.GetSnapshot());
+		TestRender::GraphicsRender(Core::dt);
 		SDL_GL_SwapWindow(window);
 	}
 
+	// Exit code when app terminates.
 	TestRender::GraphicsCleanup();
+	Core::Exit();
 	SDL_GL_DestroyContext(glContext);
 	SDL_DestroyWindow(window);
 	SDL_Quit();

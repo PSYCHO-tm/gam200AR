@@ -15,6 +15,21 @@
     {
       "kind": "INGREDIENTS",
       "def": "water"
+    },
+
+    { 
+	"kind": "EQUIPMENT", 
+	"def": "Kettle" 
+    },
+
+    { 
+	"kind": "EQUIPMENT", 
+	"def": "SockFilter" 
+    },
+
+    { 
+	"kind": "EQUIPMENT", 
+	"def": "CondensedMilkTin" 
     }
   ]
   

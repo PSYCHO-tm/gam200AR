@@ -10,13 +10,7 @@ Digipen ID:     mingxuan.lee
 
 #include "Simulation/simData.hpp"
 
-// json.hpp should live in Core/Header/nlohmann/ (that is where the ECS code looks for it).
-// If it is still sitting in Assets/Json/ we fall back to that, so this file builds either way.
-#if __has_include("nlohmann/json.hpp")
-#	include "nlohmann/json.hpp"
-#else
-#	include "json.hpp"
-#endif
+#include "nlohmann/json.hpp"
 
 #include <algorithm>
 #include <fstream>

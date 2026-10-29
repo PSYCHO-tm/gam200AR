@@ -38,6 +38,7 @@ namespace Ecs{
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrderDef, Drink, Count)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScenarioDef, Order, TimeLimitSec, Grading, Orders)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(GradeTier, Grade, Score)
+
  
     //
     /*
@@ -58,6 +59,7 @@ namespace Ecs{
         // entities and reports any unknown component or wrong type at that point.
         Template<Json> drinks;
         Template<Json> ingredients;
+        Template<Json> equipment;
  
         // Rules and config
         Template<RecipeDef> recipes;
@@ -83,11 +85,12 @@ namespace Ecs{
 
 //Reading Json from filepath
 namespace Ecs{
+    using TextReader = std::function<std::optional<std::string>(std::string const& path)>;
     /*
         [READING] Parsing via stringstream, returns a json object if successful to save
     */
     [[nodiscard]] std::optional<Json> DeserializeStream(std::istream& is);
-
+    
     /*
         [READING] Making a JSON file (delegated) by passing a file name
     */
@@ -98,6 +101,8 @@ namespace Ecs{
     */
 
     [[nodiscard]] bool SerializeObj (Json const& obj, std::string const& filepath, int indent = 4);
+
+    void SetTextReader(TextReader reader);
 
     /*
         [RETRIEVING] Passing values from a json file to individual drink objects, accepts different params

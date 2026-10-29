@@ -1,0 +1,82 @@
+{
+  "EQUIPMENT": {
+    "Kettle": {
+      "Name": "Kettle",
+      "Mesh": "Assets/Models/kettle.obj",
+      "Position": [
+        -0.15,
+        0.0,
+        0.0
+      ],
+      "YawDeg": 0,
+      "Scale": 1.0,
+      "Interactions": {
+        "pour_water": {
+          "Label": "Pour hot water",
+          "Ingredient": "water",
+          "Quantity": 220,
+          "Units": "g",
+          "Attributes": {
+            "State": "hot"
+          }
+        }
+      },
+      "Visual": {},
+      "Audio": {}
+    },
+    "SockFilter": {
+      "Name": "Sock Filter",
+      "Mesh": "Assets/Models/sock_filter.obj",
+      "Position": [
+        0.15,
+        0.0,
+        0.0
+      ],
+      "YawDeg": 0,
+      "Scale": 1.0,
+      "Interactions": {
+        "add_grounds": {
+          "Label": "Add coffee grounds",
+          "Ingredient": "coffee_beans",
+          "Quantity": 18,
+          "Units": "g",
+          "Attributes": {
+            "State": "ground"
+          }
+        },
+        "serve": {
+          "Label": "Serve",
+          "Quantity": 1,
+          "Units": "cup",
+          "AssessAs": "serve"
+        }
+      },
+      "Visual": {},
+      "Audio": {}
+    },
+    "CondensedMilkTin": {
+      "Name": "Condensed Milk Tin",
+      "Mesh": "Assets/Models/condensed_milk_tin.obj",
+      "Position": [
+        0.0,
+        0.0,
+        0.12
+      ],
+      "YawDeg": 0,
+      "Scale": 1.0,
+      "Interactions": {
+        "pour_condensed_milk": {
+          "Label": "Add condensed milk",
+          "Ingredient": "condensed_milk",
+          "Quantity": 2,
+          "Units": "tablespoon(s)",
+          "Attributes": {
+            "Sweetened": "Yes"
+          }
+        }
+      },
+      "Visual": {},
+      "Audio": {}
+    }
+  }
+}

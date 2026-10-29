@@ -22,5 +22,5 @@ public:
 
     // Slab test against a WORLD-space ray. On a hit, 'distance' is how far along the ray the box is entered
     // (0 when the ray starts inside it).
-    bool IntersectsRay(Ray const& ray, float& distance) const;
+    bool IntersectsRay(Raycast const& ray, float& distance) const;
 };

@@ -1,54 +1,57 @@
-//
-// Created by Zac Y on 15/10/2026.
-//
+/* ======================================================================================
+Main Author
+Name:           Zachary Yee
+Course:         IMGD
+Digipen ID:     zachary.y
+====================================================================================== */
 #include "Time.hpp"
 
 namespace
 {
-    bool ghasLast{}; // Bool for dt reset().
-    UI64  glastT{}; // previous frame dt.
-    F64  gframeTime{}; // current dt. (Delta Time)
-    UI32  gframeCount{}; // Lifetime no. of frames since init
-    F64  gfps{}; // FPS taken by taking gaccumFrames/gaccum.
-    F64  gFpsWindowTime{}; // Time accumulated since last window.
-    UI32  gFpsWindowFrames{}; // Frames accumulated since last window.
+    bool hasLast{}; // Bool for dt reset().
+    UI64  lastT{}; // previous frame dt.
+    F64  frameTime{}; // current dt. (Delta Time)
+    UI32  frameCount{}; // Lifetime no. of frames since init
+    F64  fps{}; // FPS taken by taking gaccumFrames/gaccum.
+    F64  fpsWindowTime{}; // Time accumulated since last window.
+    UI32  fpsWindowFrames{}; // Frames accumulated since last window.
 }
 
 void Timer::Init()
 {
     Reset();
-    gframeCount = gFpsWindowFrames = 0;
-    gfps = gFpsWindowTime = 0.0;
+    frameCount = fpsWindowFrames = 0;
+    fps = fpsWindowTime = 0.0;
 }
 
 void Timer::Reset()
 {
-    ghasLast = false;
-    gframeTime = 0.0;
+    hasLast = false;
+    frameTime = 0.0;
 }
 
 /** Get/Update the raw dt/frame time (nowT - lastT) & current fps. (accum/accumFrames) */
 void Timer::Tick(UI64 nowT)
 {
-    if (ghasLast)
+    if (hasLast)
     {
-        gframeTime = static_cast<F64>(nowT - glastT) * 1e-9;   // convert to seconds
-        ++gframeCount;
+        frameTime = static_cast<F64>(nowT - lastT) * 1e-9;   // convert to seconds
+        ++frameCount;
 
-        gFpsWindowTime += gframeTime;
-        ++gFpsWindowFrames;
+        fpsWindowTime += frameTime;
+        ++fpsWindowFrames;
         /** Limit fps data to last 0.5 sec, so stats won't keep updating & it's as accurate as it can be.*/
-        if (gFpsWindowTime >= 0.5)
+        if (fpsWindowTime >= 0.5)
         {
-            gfps = gFpsWindowFrames / gFpsWindowTime;
-            gFpsWindowTime = 0.0;
-            gFpsWindowFrames = 0;
+            fps = fpsWindowFrames / fpsWindowTime;
+            fpsWindowTime = 0.0;
+            fpsWindowFrames = 0;
         }
     }
-    glastT = nowT;
-    ghasLast = true;
+    lastT = nowT;
+    hasLast = true;
 }
 
-F64 Timer::GetFrameTime() { return gframeTime; }
-UI32 Timer::GetFrameCount() { return gframeCount; }
-F64 Timer::GetFrameRate() { return gfps; }
+F64 Timer::GetFrameTime() { return frameTime; }
+UI32 Timer::GetFrameCount() { return frameCount; }
+F64 Timer::GetFrameRate() { return fps; }

@@ -18,6 +18,7 @@
 #include <string>
 #include <cstdint>
 #include <functional>
+#include <sstream>
 #include "nlohmann/json.hpp"
 //#include "json.hpp"
 

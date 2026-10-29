@@ -53,7 +53,8 @@ static bool geometryDirty = true;
 
 //OpenGL Camera
 static void CameraDrawingInit();
-static void CameraDrawUpdate();
+static void CameraDraw();
+static bool frameUpdated = false;
 
 //Camera for drawing (read by ArGetCameraMatrices)
 static float lastView[16]{};
@@ -315,15 +316,15 @@ void ArCameraInit()
 }
 
 /**
- * @brief   Runs once per frame: updates ARCore, then draws the camera picture.
- * @details Tells ARCore about the camera texture and screen size if it does not
- *          know them yet, asks ARCore for the newest frame, then draws the camera
- *          picture. The equipment is drawn after this by Core::Render, using the
- *          matrices from ArGetCameraMatrices. If the update fails, nothing is
- *          drawn that frame.
+ * @brief   Runs once per frame: asks ARCore for its newest frame and refreshes the plane list.
+ * @details Tells ARCore about the camera texture and screen size if it does not know them yet,
+ *          then updates the session. Call this before ArGetCameraMatrices, ArGetAnchorPose,
+ *          ArGetPlacementMarker and ArGetPlanes, so they all read the same frame. If the update
+ *          fails, no planes are reported and ArCameraDraw draws nothing that frame.
  */
-void ArCameraDraw()
+void ArCameraUpdate()
 {
+    frameUpdated = false;
     drawPlaneCount = 0;   // refilled below, only from a frame that updated successfully
 
     if(session == nullptr || sessionFrame == nullptr || cameraTexture == 0)
@@ -357,7 +358,7 @@ void ArCameraDraw()
     ++frameCount;
     if(frameCount % 60 == 0)
     {
-        LOGI("ArCameraDraw alive: %d frames, update status %d", frameCount, static_cast<int>(updateStatus));
+        LOGI("ArCameraUpdate alive: %d frames, update status %d", frameCount, static_cast<int>(updateStatus));
     }
     
     if(updateStatus != AR_SUCCESS)
@@ -365,7 +366,7 @@ void ArCameraDraw()
         return;
     }
 
-    CameraDrawUpdate();
+    frameUpdated = true;
 
     if(sessionList != nullptr)
     {
@@ -389,6 +390,7 @@ void ArCameraDraw()
         {
             ArPose_create(session, nullptr, &planeCentrePose);
         }
+
         for(int32_t i = 0; i < n; ++i)
         {
             ArTrackable* trackable = nullptr;
@@ -435,9 +437,24 @@ void ArCameraDraw()
 }
 
 /**
+ * @brief   Clears the screen and draws the camera picture.
+ * @details This is the back layer, drawn before the equipment by Core::Render. It shows the frame
+ *          that ArCameraUpdate fetched this frame. If that update failed, only the clear happens.
+ */
+void ArCameraDraw()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    if(frameUpdated)
+    {
+        CameraDraw();
+    }
+}
+
+/**
  * @brief   Remembers the new screen size and rotation for ARCore.
  * @details Called when the phone's width, height or rotation changes.
- *          ARCore is told later, from ArCameraDraw.
+ *          ARCore is told later, from ArCameraUpdate.
  * @param[in] width     Screen width in pixels.
  * @param[in] height    Screen height in pixels.
  * @param[in] rotation  Screen rotation: 0, 1, 2 or 3 (Android Surface.ROTATION_*).
@@ -551,7 +568,7 @@ static GLuint BuildProgram(const char* vertexSource, const char* fragmentSource)
 /**
  * @brief   Builds the camera program and finds where its uCamera variable is.
  * @details Called from ArCameraInit. The location is looked up once here and
- *          used every frame by CameraDrawUpdate.
+ *          used every frame by CameraDraw.
  */
 static void CameraDrawingInit()
 {
@@ -570,7 +587,7 @@ static void CameraDrawingInit()
  *          then draws the screen-sized rectangle with the camera program.
  *          This is the back layer, drawn before the equipment.
  */
-static void CameraDrawUpdate()
+static void CameraDraw()
 {
     if(cameraProgram == 0)
     {
@@ -740,7 +757,7 @@ static void TryPlaceAnchorOnPlane(ArCamera* camera)
 
 /**
  * @brief   Gives the phone camera's view and projection matrices from the latest frame.
- * @details Call after ArCameraDraw. Only valid while ARCore is tracking, and for a few
+ * @details Call after ArCameraUpdate. Only valid while ARCore is tracking, and for a few
  *          frames after it drops (the last good camera is held, so the equipment does
  *          not blink when tracking flickers).
  * @param[out] view        16 floats, in the layout OpenGL uses (column-major).
@@ -749,7 +766,7 @@ static void TryPlaceAnchorOnPlane(ArCamera* camera)
  */
 bool ArGetCameraMatrices(float* view, float* projection)
 {
-    if(session == nullptr || sessionFrame == nullptr)
+    if(session == nullptr || sessionFrame == nullptr || frameUpdated == false)
     {
         return false;
     }

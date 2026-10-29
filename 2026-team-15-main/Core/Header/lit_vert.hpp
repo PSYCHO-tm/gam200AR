@@ -1,4 +1,3 @@
-// Generated from C:/Users/WenJie/Documents/GitHub/2026-team-15/Assets/Shader/lit.vert
 // Do not edit: edit the shader file instead.
 #pragma once
 inline constexpr const char* gLitVert = R"GLSL(#version 300 es

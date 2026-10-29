@@ -1,7 +1,13 @@
+/* ======================================================================================
+Main Author
+Name:           Zachary Yee
+Course:         IMGD
+Digipen ID:     zachary.y
+====================================================================================== */
 #pragma once
 #include <cstdint>
 
 enum class ACTIONS : std::uint8_t
 {
-    EMPTY, PLAYSOUND, PAUSESOUND, STOPSOUND, LOOP, COUNT,
+    EMPTY, COUNT,
 };// keep Count last

@@ -1,0 +1,27 @@
+{
+    "entities": {
+        "0": {
+            "Components": {
+                "DefRef": {
+                    "Id": "Kopi",
+                    "Kind": "DRINKS",
+                    "Overrides": {}
+                },
+                "Name": {
+                    "Value": "Kopi"
+                },
+                "Props": {
+                    "Audio": {},
+                    "Visual": {}
+                },
+                "RecipeRef": {
+                    "Id": "Kopi_recipe"
+                },
+                "Temp": {
+                    "Status": "Hot"
+                }
+            }
+        }
+    },
+    "schema_version": 1
+}

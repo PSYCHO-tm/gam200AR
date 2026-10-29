@@ -1,5 +1,5 @@
 #pragma once
-#include <GLES3/gl3.h>
+#include "GlApi.hpp"
 
 #include <string>
 #include <unordered_map>

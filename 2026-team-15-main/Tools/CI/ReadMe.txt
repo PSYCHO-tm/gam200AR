@@ -7,6 +7,7 @@ One script builds the shared code (`Core/`), builds every test in `Tests/`, and 
 Run this:
 sudo apt update
 sudo apt install -y build-essential cmake git
+sudo apt install clang-format clang-tidy
 - Internet on the **first** run only (it downloads Catch2 into `build/`)
 
 ### Run all tests

@@ -1,0 +1,18 @@
+{
+	"Volume": { "Master": 1.0, "Music": 0.6, "Sfx": 1.0 },
+
+	"Music": {
+		"cafe_theme": { "File": "Audio/Music/cafe_theme.wav", "Volume": 0.8 }
+	},
+
+	"Sfx": {
+		"pour_milk_temp01.wav":    "Audio/Sfx/pour_milk_temp01.wav",
+		"pour_milk_temp02.wav":   "Audio/Sfx/pour_milk_temp02.wav",
+		"stir_coffee_temp01.wav":    "Audio/Sfx/stir_coffee_temp01.wav",
+		"stir_sfx.wav":     "Audio/Sfx/stir_sfx.wav",
+		"UI_Button_Click_Positive_1.wav":     "Audio/Sfx/UI_Button_Click_Positive_1.wav",
+		"UI_Notification_D.wav":    { "File": "Audio/Sfx/UI_Notification_D.wav", "Volume": 0.7 },
+		"UI_Quit_C_2.wav":    "Audio/Sfx/UI_Quit_C_2.wav",
+		"UI_Select.wav": "Audio/Sfx/UI_Select.wav"
+	}
+}

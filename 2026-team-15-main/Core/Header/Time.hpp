@@ -1,6 +1,9 @@
-//
-// Created by Zac Y on 15/10/2026.
-//
+/* ======================================================================================
+Main Author
+Name:           Zachary Yee
+Course:         IMGD
+Digipen ID:     zachary.y
+====================================================================================== */
 #pragma once
 #include <chrono>
 #include "Types.hpp"
@@ -15,7 +18,7 @@ namespace Timer
 
     void Init();            // Start the timer.
     void Reset();           // Set next tick dt to 0
-    void Tick(UI64 nowT);   // Call exactly once per frame
+    void Tick(UI64 nowT);        // Call exactly once per frame
 }
 
 /** Read-only accessors */

@@ -35,7 +35,7 @@ Collider Collider::Transformed(Matrix4x4 const& transform) const
     return result;
 }
 
-bool Collider::IntersectsRay(Ray const& ray, float& distance) const
+bool Collider::IntersectsRay(Raycast const& ray, float& distance) const
 {
     if (!hasBounds)
     {

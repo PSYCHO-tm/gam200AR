@@ -1,11 +1,35 @@
 #include "Shader.hpp"
 
-#include <android/log.h>
-
+#include <string>
 #include <utility>
 
-#define LOG_TAG "kopitwin"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#include "PlatformLog.hpp"
+
+namespace
+{
+#if !defined(__ANDROID__)
+    // The shader files are written for OpenGL ES ("#version 300 es").
+    // Desktop OpenGL wants "#version 330 core" and has no precision qualifiers.
+    std::string ToDesktopGlsl(const char* source)
+    {
+        std::string text{source};
+
+        constexpr const char* esVersion = "#version 300 es";
+        if (text.rfind(esVersion, 0) == 0)
+        {
+            text.replace(0, std::char_traits<char>::length(esVersion), "#version 330 core");
+        }
+
+        constexpr const char* precisionLine = "precision mediump float;";
+        const std::size_t at = text.find(precisionLine);
+        if (at != std::string::npos)
+        {
+            text.erase(at, std::char_traits<char>::length(precisionLine));
+        }
+        return text;
+    }
+#endif
+}
 
 Shader::Shader(Shader&& other) noexcept
     : program{other.program},
@@ -29,6 +53,10 @@ Shader& Shader::operator=(Shader&& other) noexcept
 GLuint Shader::Compile(GLenum type, const char* source)
 {
     GLuint shader = glCreateShader(type);
+#if !defined(__ANDROID__)
+    const std::string desktopSource = ToDesktopGlsl(source);
+    source = desktopSource.c_str();
+#endif
     glShaderSource(shader, 1, &source, nullptr);
     glCompileShader(shader);
 

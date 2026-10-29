@@ -12,6 +12,11 @@ object NativeCore {
     external fun nativeGetTouch(): String
     external fun nativeSetInput(x: Float, y: Float, action: Int)
     external fun nativeResetInput()
-
+    external fun nativeGetActions(): String
+    external fun nativeDoAction(actionId: String)
     external fun nativeTogglePause(paused: Boolean)
+
+    external fun nativeAudioKey(id: Int)
+    external fun nativeAudioPause()
+    external fun nativeAudioResume()
 }

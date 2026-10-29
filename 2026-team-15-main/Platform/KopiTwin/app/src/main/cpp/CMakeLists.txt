@@ -43,8 +43,9 @@ embed_shader(${REPO_ROOT}/Assets/Shader/lit.vert gLitVert ${REPO_ROOT}/Core/Head
 embed_shader(${REPO_ROOT}/Assets/Shader/lit.frag gLitFrag ${REPO_ROOT}/Core/Header/lit_frag.hpp)
 
 include(${REPO_ROOT}/Cmake/EmbedAssets.cmake)
+file(GLOB JSON_ASSETS RELATIVE ${REPO_ROOT} CONFIGURE_DEPENDS ${REPO_ROOT}/Assets/Json/*.json)
 embed_assets(${GEN_DIR}/EmbeddedAssets.hpp
-        Assets/Json/Equipment.json
+        ${JSON_ASSETS}
         Assets/Models/kettle.obj
         Assets/Models/sock_filter.obj
         Assets/Models/condensed_milk_tin.obj

@@ -1,5 +1,9 @@
 #pragma once
 #include "sharedlib.hpp"
+#include "Transform3D.hpp"
+#include "Transform2D.hpp"
+#include "Raycast.hpp"
+#include "Collider.hpp"
 #include "JsonSceneCoordinator.hpp"
 #include "DefinitionLoader.hpp"
  
@@ -48,6 +52,10 @@ struct Result   {
     std::string Grade;
 };
 
+struct MeshRef { 
+    std::string Path; 
+};
+
 //delete if unusued
 // struct Transform { 
 //     float x = 0, 
@@ -55,18 +63,27 @@ struct Result   {
 //     rotation = 0; 
 // };
  
+inline void to_json(Ecs::Json& j, Vector3D const& v)   { j = Ecs::Json::array({v.x, v.y, v.z}); }
+inline void from_json(Ecs::Json const& j, Vector3D& v) { v = Vector3D{j.at(0).get<float>(), j.at(1).get<float>(), j.at(2).get<float>()}; }
+inline void to_json(Ecs::Json& j, Vector2D const& v)   { j = Ecs::Json::array({v.x, v.y}); }
+inline void from_json(Ecs::Json const& j, Vector2D& v) { v = Vector2D{j.at(0).get<float>(), j.at(1).get<float>()}; }
+
 //This macro expects every single listed field to be present in JSON Obj
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Name, Value)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Units, Value)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RecipeRef, Id)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Temp, Status)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DefRef, Kind, Id, Overrides)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MeshRef, Path)
 
 //This macro allows the listed fields to be optional in the JSON
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Attributes, Allowed)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Contents, Items)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Result, Score, Grade)
-//NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Transform, x, y, rotation) //del if unused
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Transform3D, scale, rotation, position) //del if unused
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Transform2D, scale, rotation, position) //del if unused
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Raycast, origin, direction) //del if unused
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Collider, minPoint, maxPoint, hasBounds) //del if unused
  
 
 /*
@@ -124,7 +141,14 @@ inline void from_json(Ecs::Json const& j, Props& p)
     X(Props)              \
     X(DefRef)             \
     X(Contents)           \
-    X(Result)
+    X(Result)             \
+    X(Transform3D)        \
+    X(Transform2D)        \
+    X(Collider)           \
+    X(Raycast)            \
+    X(Vector2D)           \
+    X(Vector3D)           \
+    X(MeshRef)           
     //X(Transform) put a '\' on this when needed
     
 /*
@@ -146,6 +170,7 @@ namespace Ecs{
     //std::string doesnt work here..
     inline constexpr char kDrinks[]      = "DRINKS";
     inline constexpr char kIngredients[] = "INGREDIENTS";
+    inline constexpr char kEquipment[] = "EQUIPMENT";
 
     /*
         [Factory]
