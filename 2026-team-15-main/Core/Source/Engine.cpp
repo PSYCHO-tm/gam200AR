@@ -216,37 +216,6 @@ namespace
         if (n < 0 || static_cast<UI32>(n) >= size) return 0;
         UI32 used = static_cast<UI32>(n);
 
-        for (Ecs::Entity e : world.coordinator.LivingEntities())
-        {
-            if (!world.coordinator.HasComponent<Name>(e)) continue;      // check before Get: Get asserts if missing
-
-            char const* temp = world.coordinator.HasComponent<Temp>(e)
-                            ? world.coordinator.GetComponent<Temp>(e).Status.c_str()
-                            : "-";
-            n = std::snprintf(buf + used, size - used, "#%u %s %s\n",
-                            e, world.coordinator.GetComponent<Name>(e).Value.c_str(), temp);
-            if (n < 0 || static_cast<UI32>(n) >= size - used) break;     // out of room: stop
-            used += static_cast<UI32>(n);
-        }
-        
-        if (world.runner && !world.runner->Orders().empty())
-        {
-            Ecs::Entity const order = world.runner->Orders().front();
-            if (world.coordinator.isAlive(order) && world.coordinator.HasComponent<Contents>(order))
-            {
-                n = std::snprintf(buf + used, size - used, "Cup #%u:", order);
-                if (n < 0 || static_cast<UI32>(n) >= size - used) return used;
-                used += static_cast<UI32>(n);
-                for (auto const& [id, item] : world.coordinator.GetComponent<Contents>(order).Items)
-                {
-                    n = std::snprintf(buf + used, size - used, " %s %.0f", id.c_str(), item.Amount);
-                    if (n < 0 || static_cast<UI32>(n) >= size - used) return used;
-                    used += static_cast<UI32>(n);
-                }
-                n = std::snprintf(buf + used, size - used, "\n%s\n", gLastServe.c_str());
-                if (n > 0 && static_cast<UI32>(n) < size - used) used += static_cast<UI32>(n);
-            }
-        }
         return used;
     }
 

@@ -202,7 +202,7 @@ class MainActivity : AppCompatActivity() {
         layout.addView(glView)
         layout.addView(actionBar, actionParams)
         layout.addView(statsText, statsParams)
-        //layout.addView(infoText, infoParams)
+        layout.addView(infoText, infoParams)
         layout.addView(pauseButton, buttonParams)
         layout.addView(buildAudioPanel(), audioSet)
 
