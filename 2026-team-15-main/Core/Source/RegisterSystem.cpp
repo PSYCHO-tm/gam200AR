@@ -69,8 +69,9 @@ namespace Ecs{
     // ------------------------------------------------------------------
     bool RecipeCheckSystem::Evaluate(std::string const& gradingSet, ErrorChecker& errs)
     {
-        auto tiers = db->grading.find(gradingSet);
-        if (tiers == db->grading.end()) {
+        // gradingSet is a parameter (could be anything), so this one stays a runtime check
+        auto tiers = db->Get<std::vector<GradeTier>>(kGrading, gradingSet);
+        if (!tiers) {
             errs.push_back("unknown grading set '" + gradingSet + "'");
             return false;
         }
@@ -80,19 +81,21 @@ namespace Ecs{
 
         for (Entity e : list) {
             std::string recipeId = world->GetComponent<RecipeRef>(e).Id;
-            auto recipe = db->recipes.find(recipeId);
-            if (recipe == db->recipes.end()) {
+            // Rules<RecipeRef> already guarantees this exists (Load_All + SpawnInstance);
+            // the branch only guards against a RecipeRef edited at runtime (SetField)
+            auto recipe = db->Get<RecipeDef>(kRecipes, recipeId);
+            if (!recipe) {
                 errs.push_back("entity " + std::to_string(e) + ": unknown recipe '" + recipeId + "'");
                 ok = false;
                 continue;
             }
 
             Result r;
-            r.Score = ScoringCup(recipe->second, world->GetComponent<Contents>(e));
-            r.Grade = GradeFor(r.Score, tiers->second);
+            r.Score = ScoringCup(*recipe, world->GetComponent<Contents>(e));
+            r.Grade = GradeFor(r.Score, *tiers);
 
             if (world->HasComponent<Result>(e)) world->GetComponent<Result>(e) = r;
-            else                                world->AddComponent<Result>(e, r);
+            else world->AddComponent<Result>(e, r);
         }
         return ok;
     }
@@ -118,8 +121,10 @@ namespace Ecs{
         */
     bool ScenarioRunner::Start(std::string const& scenarioName, ErrorChecker& errs)
     {
-        auto sc = db.scenarios.find(scenarioName);
-        if (sc == db.scenarios.end()) {
+        // scenarioName comes from the caller, so this stays a runtime check.
+        // Everything INSIDE the scenario (drinks, counts, grading) was checked by Rules<ScenarioDef>.
+        auto sc = db.Get<ScenarioDef>(kScenarios, scenarioName);
+        if (!sc) {
             errs.push_back("unknown scenario '" + scenarioName + "'");
             return false;
         }
@@ -127,7 +132,7 @@ namespace Ecs{
         ClearOrders();
         current = scenarioName;
 
-        for (auto const& o : sc->second.Orders) {
+        for (auto const& o : sc->Orders) {
             for (int i = 0; i < o.Count; ++i) {
                 auto e = SpawnInstance(scene, db, kDrinks, o.Drink, Json::object(), errs);
                 if (!e) {    // undo this run completely
@@ -153,7 +158,7 @@ namespace Ecs{
             return false;
         }
 
-        if (!db.ingredients.count(ingredient)) {
+        if (!db.Find(kIngredients, ingredient)) {
             errs.push_back("unknown ingredient '" + ingredient + "'");
             return false;
         }
@@ -174,13 +179,16 @@ namespace Ecs{
     */
     bool ScenarioRunner::Finish(ScenarioReport& out, ErrorChecker& errs)
     {
-        auto sc = db.scenarios.find(current);
-        if (current.empty() || sc == db.scenarios.end()) {
+
+        std::optional<ScenarioDef> sc;
+        if (!current.empty()) sc = db.Get<ScenarioDef>(kScenarios, current);
+
+        if (!sc) {
             errs.push_back("no scenario is running");
             return false;
         }
 
-        if (!check.Evaluate(sc->second.Grading, errs)) return false;
+        if (!check.Evaluate(sc->Grading, errs)) return false;
 
         out = ScenarioReport{};
         out.scenario = current;
@@ -193,8 +201,9 @@ namespace Ecs{
             sum += r.Score;
         }
 
+        // Rules<ScenarioDef> guarantees the grading set exists, and Evaluate above already used it
         out.average = out.drinks.empty() ? 0.0 : sum / static_cast<double>(out.drinks.size());
-        out.grade   = GradeFor(out.average, db.grading.at(sc->second.Grading));
+        out.grade   = GradeFor(out.average, db.Get<std::vector<GradeTier>>(kGrading, sc->Grading).value_or(std::vector<GradeTier>{}));
         return true;
     }
 }

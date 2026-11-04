@@ -1,0 +1,19 @@
+{
+  "STORAGE": [
+    "Drinks.json",
+    "Ingredients.json",
+    "Equipment.json",
+    "Recipes.json",
+    "Scenarios.json",
+    "Grading.json"
+  ],
+
+  "CONFIG": {
+    "Audio":      "Audio.json",
+    "Simulation": "Simulation.json"
+  },
+
+  "SCENES": { "Main": "Scenes.json" },
+  "START_SCENE": "Main"
+  
+}

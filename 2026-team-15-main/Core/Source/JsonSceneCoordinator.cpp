@@ -48,36 +48,22 @@ namespace Ecs{
     /*
         Wrapper that runs CheckingEntity
     */
-    bool JsonScene::ApplyComponents(Entity e, Json const& jsonfile, std::string const& pos, ErrorChecker& errsvec, bool dryRun){
+    bool JsonScene::ApplyComponents(Entity e, Json const& file, std::string const& pos, ErrorChecker& errsvec){
         
-        assert(jsonfile.is_object() && "callers must check with FindComponents first");
+        assert(file.is_object() && "callers must check with FindComponents first");
 
-        for(auto const& [name, data] : jsonfile.items()){
+        for (auto const& [name, data] : file.items()) {
             auto p = io.find(name);
             if (p == io.end()) {
                 errsvec.push_back(pos + ": unknown component [" + name + "]");
                 return false;
             }
 
-            // Skip Free-forms like Props
-            if (name != "Props" && data.is_object()) {
-                Json blank = p->second.bydefault();
-                if (blank.is_object()) {
-                    for (auto const& [k, v] : data.items()) {
-                        if (!blank.contains(k)) {
-                            errsvec.push_back(pos + "." + name + ": unknown or typo'd key '" + k + "'");
-                            return false;
-                        }
-                    }
-                }
+            try {
+                p->second.assign(cord, e, data);
             }
-
-            try { 
-                if (dryRun) p->second.check(data);              // testing the conversion
-                else        p->second.assign(cord, e, data);    // attach to the entity
-            }
-            catch (Json::exception const& exep) {
-                errsvec.push_back(pos + "." + name + ": " + exep.what());
+            catch (Json::exception const& ex) {
+                errsvec.push_back(pos + "." + name + ": " + ex.what());
                 return false;
             }
         }
@@ -140,7 +126,7 @@ namespace Ecs{
 
         //Forces coordinator to spawn an entity with exact ID
         Entity e = cord.CreateEntityWithId(id);
-        return ApplyComponents(e, *comps, path, errsvec, false);
+        return ApplyComponents(e, *comps, path, errsvec);
     }
 
     /*
@@ -217,7 +203,7 @@ namespace Ecs{
 
         //Create a fresh entity ID 
         Entity e = cord.CreateEntity();
-        if (!ApplyComponents(e, *comps , path, errsvec, false)) {
+        if (!ApplyComponents(e, *comps , path, errsvec)) {
             cord.DestroyEntity(e);
             return std::nullopt;
         }
@@ -288,11 +274,35 @@ namespace Ecs{
     /*
         Ensures that a template / blueprint is correctly formated before use
     */
-    bool JsonScene::CheckDefinition(Json const& def, std::string const& where, ErrorChecker& errs){
-        
-        Json const* comps = FindComponents(def, where, errs);
+    bool JsonScene::CheckDefinition(Json const& def, ValidationS const& ctx) {
 
-        return comps && ApplyComponents(0, *comps, where, errs, true);   
+        Json const *comps = FindComponents(def, ctx.location, ctx.errs);
+        if (!comps) return false;
+
+        bool pass = true;
+        for (auto const &[name, data]: comps->items()) {
+            //
+            ValidationS here{ctx.db, ctx.errs, ctx.location + "." + name};
+
+            auto p = io.find(name);
+            if (p == io.end()) {
+                here.Fail("unknown component");
+                pass = false;
+                continue;
+            }
+
+            std::size_t before = ctx.errs.size();
+
+            try {
+                p->second.check(data, here);
+            }
+            catch (Json::exception const &e) {
+                here.Fail(e.what());
+            }
+            pass = pass && ctx.errs.size() == before;
+        }
+
+        return pass;
     }
 
     /*

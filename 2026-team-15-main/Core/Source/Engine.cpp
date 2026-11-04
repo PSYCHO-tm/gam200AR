@@ -175,11 +175,15 @@ namespace
         world.systems = Ecs::RegisterAllSystems(world.coordinator, world.db);
 
         Ecs::ErrorChecker errs;
-        auto check = [](Ecs::Json const& def, std::string const& where, Ecs::ErrorChecker& e)
+        auto check = [](Ecs::Json const& def, Ecs::ValidationS const& ctx)
         {
-            return world.scene.CheckDefinition(def, where, e);
+            return world.scene.CheckDefinition(def, ctx);
         };
-        if (!Ecs::Load_All("Assets/Json", world.db, errs, check))
+
+        static Ecs::TableRules tables;          // rules for non-entity tables (TABLE_LIST)
+        if (tables.empty()) RegisterAllTables(tables);
+
+        if (!Ecs::Load_All("Assets/Json/JsonManifest.json", world.db, errs, check, &tables))
         {
             for (std::string const& e : errs) LOGE("ECS load error: %s", e.c_str());
             return;

@@ -1,6 +1,7 @@
 #pragma once
 #include "sharedlib.hpp"
 #include "Coordinator.hpp"
+#include "DefinitionLoader.hpp"
 
 namespace Ecs{
 
@@ -34,10 +35,10 @@ namespace Ecs{
 
         Low level to try and parse Json chunk into c++ struct T
     */
-    template<typename T>
-    void CheckComponent(Ecs::Json const& jsonfile){
-        (void) jsonfile.get<T>();
-    }
+//    template<typename T>
+//    void CheckComponent(Ecs::Json const& jsonfile){
+//        (void) jsonfile.get<T>();
+//    }
 
     /*
         Function sets a component whether or not it exists.
@@ -64,7 +65,7 @@ namespace Ecs{
         //(*save) is a function pointer that points to save etc
         std::optional<Json> (*save)(Coordinator&, Entity);
 
-        void (*check)(Json const&);
+        void (*check)(Json const&, ValidationS const& );
 
         void (*assign)(Coordinator&, Entity, Json const&);
 
@@ -113,7 +114,7 @@ namespace Ecs{
         /*
             Ensures that a template / blueprint is correctly formated before use
         */
-        bool CheckDefinition(Json const& def, std::string const& where, ErrorChecker& errs);
+        bool CheckDefinition(Json const& def, ValidationS const& ctx);
         
 
         std::vector<std::string> ComponentNames() const;
@@ -142,7 +143,7 @@ namespace Ecs{
 
         private:
         // Wrapper that runs CheckingEntity
-        bool ApplyComponents(Entity e, Json const& jsonfile, std::string const& path, ErrorChecker& errsvec, bool dryRun);
+        bool ApplyComponents(Entity e, Json const& file, std::string const& path, ErrorChecker& errsvec);
 
         //Preserves exact identity ID string read from json file
         bool LoadEntity(std::string const& idStr, Json const& j, std::string const& path, ErrorChecker& errsvec); 
@@ -172,7 +173,7 @@ namespace Ecs{
     void JsonScene::Register(std::string const& name){
         cord.RegisterComponent<T>();
         
-        io[name] = IoParts{ &SaveComponent<T>, &CheckComponent<T>, &AssignComponent<T>, &DefaultComponent<T>};
+        io[name] = IoParts{ &SaveComponent<T>, &CheckAs<T>, &AssignComponent<T>, &DefaultComponent<T>};
     }
 
    

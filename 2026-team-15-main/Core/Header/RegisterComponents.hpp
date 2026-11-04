@@ -6,7 +6,9 @@
 #include "Collider.hpp"
 #include "JsonSceneCoordinator.hpp"
 #include "DefinitionLoader.hpp"
- 
+
+
+
 /*
   Struct Mapping::
    HOW TO ADD A NEW COMPONENT (3 steps, all in this file)
@@ -56,18 +58,41 @@ struct MeshRef {
     std::string Path; 
 };
 
-//delete if unusued
-// struct Transform { 
-//     float x = 0, 
-//     y = 0, 
-//     rotation = 0; 
-// };
+
+//=============================================================================================================================
+/*
+    Extra rules (value ranges, cross-references) for components and tables.
+    Declare here, write the body in RegisterComponents.cpp.
+    Types without an entry here still get type / required-field / typo checks.
+*/
+namespace Ecs{
+    template <>
+    struct Rules<::RecipeRef>{
+        static void Check(::RecipeRef const& r, ValidationS const& ctx);
+    };
+
+    template <>
+    struct Rules<RecipeDef>{
+        static void Check(RecipeDef const& r, ValidationS const& ctx);
+    };
+
+    template <>
+    struct Rules<ScenarioDef>{
+        static void Check(ScenarioDef const& s, ValidationS const& ctx);
+    };
+
+    template <>
+    struct Rules<std::vector<GradeTier>>{
+        static void Check(std::vector<GradeTier> const& tiers, ValidationS const& ctx);
+    };
+}
  
 inline void to_json(Ecs::Json& j, Vector3D const& v)   { j = Ecs::Json::array({v.x, v.y, v.z}); }
 inline void from_json(Ecs::Json const& j, Vector3D& v) { v = Vector3D{j.at(0).get<float>(), j.at(1).get<float>(), j.at(2).get<float>()}; }
 inline void to_json(Ecs::Json& j, Vector2D const& v)   { j = Ecs::Json::array({v.x, v.y}); }
 inline void from_json(Ecs::Json const& j, Vector2D& v) { v = Vector2D{j.at(0).get<float>(), j.at(1).get<float>()}; }
 
+//========================================================================================================================
 //This macro expects every single listed field to be present in JSON Obj
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Name, Value)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Units, Value)
@@ -131,6 +156,7 @@ inline void from_json(Ecs::Json const& j, Props& p)
 /*
     X-Macro Design pattern to reduce registration boilerplate
     Also to prevent any duplication and sync error
+    Add on (1)
 */
 #define COMPONENT_LIST(X) \
     X(Name)               \
@@ -162,15 +188,37 @@ inline void RegisterAllComponents(Ecs::JsonScene& jc)
     COMPONENT_LIST(X)
 #undef X
 }
+
+/*
+    For the non-entity tables (files whose entries have no "Components") / Other JSON Tables.
+    X(TABLE_NAME, Type): TABLE_NAME is the top-level key in the JSON file,
+    Type is the struct each entry converts to.
+    Add on (3): a new table = its file in JsonManifest STORAGE + one line here.
+*/
+#define TABLE_LIST(X)                          \
+    X(RECIPES,  Ecs::RecipeDef)                \
+    X(SCENARIO, Ecs::ScenarioDef)              \
+    X(GRADING,  std::vector<Ecs::GradeTier>)
+
+inline void RegisterAllTables(Ecs::TableRules& rules)
+{
+#define X(Name, T) rules[#Name] = &Ecs::CheckAs<T>;
+    TABLE_LIST(X)
+#undef X
+}
  
 
 //Building Entity from Json
 namespace Ecs{
 
     //std::string doesnt work here..
+    //For whatever components are being added, add on here (2)
     inline constexpr char kDrinks[]      = "DRINKS";
     inline constexpr char kIngredients[] = "INGREDIENTS";
-    inline constexpr char kEquipment[] = "EQUIPMENT";
+    inline constexpr char kEquipment[]   = "EQUIPMENT";
+    inline constexpr char kRecipes[]     = "RECIPES";
+    inline constexpr char kScenarios[]   = "SCENARIO";
+    inline constexpr char kGrading[]     = "GRADING";
 
     /*
         [Factory]
