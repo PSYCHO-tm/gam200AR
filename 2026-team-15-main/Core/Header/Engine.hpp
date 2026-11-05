@@ -46,7 +46,7 @@ namespace Core
     bool TryInitialize(); // Moved implementation of Init() to here + added logging (Raphael's acceptance criteria)
     inline AudioSystem audio;
 
-    void Init();
+    bool Init();
     void Start();
     void Update(UI64 nowT = Timer::Now()); // Execute one iteration of the loop body
     void Render();            // Draw: camera picture, then the equipment

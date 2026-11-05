@@ -100,6 +100,9 @@ namespace Ecs{
         */
         std::optional<Entity> Spawn(Json const& jsonfile, std::string const& path, ErrorChecker& errsvec);
 
+        //For "hot reload"
+        bool Reapply(Entity e, Json const& def, std::string const& pos, ErrorChecker& errsvec);
+
         /*
             Generates a complete world snapshot and serializes it out to a target JSON file path
         */

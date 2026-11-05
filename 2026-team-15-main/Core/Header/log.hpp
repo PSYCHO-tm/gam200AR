@@ -9,6 +9,10 @@
 #include <sstream>
 #include <string>
 
+#if defined(__ANDROID__)
+  #include <android/log.h> // For logging in android
+#endif
+
 #ifndef KOPI_LOG_DIR
   #define KOPI_LOG_DIR "."                 // CMake sets this to <build>/logs
 #endif
@@ -21,6 +25,8 @@
 
 namespace Log
 {
+    enum Level { Debug, Info, Warn, Error }; // For logcat to know priority
+
     inline std::ofstream& File() { static std::ofstream f; return f; }
 
     // Redirect the log (tests use this). Replaces the file's contents.
@@ -52,11 +58,18 @@ namespace Log
     }
 
     // Console + file. The file opens on first use; every line is flushed.
-    inline void Write(const std::string& line)
+    inline void Write([[maybe_unused]] Level level, const std::string& line)
     {
         static std::mutex m;
         std::lock_guard<std::mutex> lock(m);
 
+        #if defined(__ANDROID__)
+            int const prio = level == Level::Debug ? ANDROID_LOG_DEBUG
+                        : level == Level::Info  ? ANDROID_LOG_INFO
+                        : level == Level::Warn  ? ANDROID_LOG_WARN : ANDROID_LOG_ERROR;
+            __android_log_write(prio, "kopitwin", line.c_str());   // logcat is the console on a phone
+        #else
+        
         std::cout << line << '\n';
         auto& f = File();
         if (!f.is_open())
@@ -66,15 +79,23 @@ namespace Log
             f.open(std::string(KOPI_LOG_DIR) + "/kopitwin_log.txt", std::ios::out | std::ios::app);
         }
         if (f.is_open()) { f << (line + "\n"); f.flush(); }
+        #endif
     }
 }
 
-#define LOG(tag, ...) \
+#define LOG(level, tag, ...) \
     do { std::ostringstream logStream_; \
          logStream_ << Log::Timestamp() << " " << tag << " " << LOG_FILE_NAME << ":" << __LINE__ << " " << __VA_ARGS__; \
-         Log::Write(logStream_.str()); } while (0)
+         Log::Write(level, logStream_.str()); } while (0)
 
-#define LOG_INFO(...)  LOG("INFO ", __VA_ARGS__)
-#define LOG_DEBUG(...) LOG("DEBUG", __VA_ARGS__)
-#define LOG_WARN(...)  LOG("WARN ", __VA_ARGS__)
-#define LOG_ERROR(...) LOG("ERROR", __VA_ARGS__)
+#define LOG_INFO(...)  LOG(Log::Level::Info,  "INFO ", __VA_ARGS__)
+
+// Debug mode
+#if defined(NDEBUG) 
+  #define LOG_DEBUG(...) ((void)0)
+#else
+  #define LOG_DEBUG(...) LOG(Log::Level::Debug, "DEBUG", __VA_ARGS__)
+#endif
+
+#define LOG_WARN(...)  LOG(Log::Level::Warn,  "WARN ", __VA_ARGS__)
+#define LOG_ERROR(...) LOG(Log::Level::Error, "ERROR", __VA_ARGS__)

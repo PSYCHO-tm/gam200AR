@@ -6,10 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Enable compilation database generation for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# MEM LEAKS, applies to the library AND the tests
+# MEM LEAKS, applies to the library AND the tests (DEBUG ONLY)
 if (NOT MSVC)
-	add_compile_options(-fsanitize=address -g)
-	add_link_options(-fsanitize=address)
+    add_compile_options($<$<CONFIG:Debug>:-fsanitize=address>)
+    add_link_options($<$<CONFIG:Debug>:-fsanitize=address>)
 endif()
 
 # Linking Shared Code AND Tests

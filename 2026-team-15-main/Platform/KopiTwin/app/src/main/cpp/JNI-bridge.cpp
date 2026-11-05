@@ -79,9 +79,9 @@ Java_com_example_kopitwin_MainActivity_nativeInit(JNIEnv* /*env*/, jobject /*thi
     LOGI("nativeInit called");
     SDL_SetMainReady();
     Ecs::SetTextReader(FindEmbeddedText);
-    Core::Init();
+    bool const ok = Core::Init();
     LOGI("audio ready=%d err=%s", Core::audio.IsReady(), Core::audio.GetLastError().c_str());
-    return JNI_TRUE;
+    return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

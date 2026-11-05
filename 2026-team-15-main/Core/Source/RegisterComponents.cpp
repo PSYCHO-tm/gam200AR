@@ -1,5 +1,6 @@
 #include "RegisterComponents.hpp"
 #include "sharedlib.hpp"
+#include <set>
 
 namespace Ecs{
 
@@ -72,7 +73,20 @@ namespace Ecs{
         if (tiers.back().Score != 0) ctx.Fail("last tier should have Score 0");
     }
 
-     /*
+    // Ingredient Attributes: every allowed list has at least one value, and no value is listed twice
+    void Rules<::Attributes>::Check(::Attributes const& a, ValidationS const& ctx)
+    {
+        for (auto const& [key, values] : a.Allowed) {
+            ValidationS here = ctx.At("Allowed").At(key);
+            if (values.empty()) here.Fail("needs at least one allowed value");
+
+            std::set<std::string> seen;
+            for (auto const& v : values)
+                if (!seen.insert(v).second) here.Fail("'" + v + "' is listed twice");
+        }
+    }
+
+    /*
         [Factory]
         Builds ONE entity from a definition in the Database.
         kind      = kDrinks or kIngredients
@@ -81,11 +95,14 @@ namespace Ecs{
 
         The new entity always gets a DefRef {Kind, Id, Overrule}.
         On any problem: returns nullopt, writes a message to errs, destroys
+
+        But this function is split into 2 versions, 1 for SpawnInstance (normal)
+        and the other is for Hot reloading(Reapply)
     */
-    std::optional<Entity> SpawnInstance(Ecs::JsonScene& jc, Ecs::Database const& db, std::string const& kind, 
-    std::string const& id, Json const& overrides, ErrorChecker& errs)
-    {
-       //Add on here when other keys are needed to be updated
+    std::optional<Json> BuildInstance(JsonScene& jc, Database const& db, std::string const& kind,
+                                      std::string const& id, Json const& overrides, ErrorChecker& errs){
+
+        //Add on here when other keys are needed to be updated
         std::string pos = kind + "." + id;
 
         Json const* found = db.Find(kind, id);
@@ -95,7 +112,7 @@ namespace Ecs{
         }
 
         // Work on a copy, so that the Database itself is never changed
-         Json def = *found;
+        Json def = *found;
 
         if (!def.is_object() || !def.contains("Components") || !def["Components"].is_object()) {
             errs.push_back(pos + ": definition has no 'Components' object");
@@ -116,7 +133,7 @@ namespace Ecs{
         // merge_patch: matching keys are replaced, objects merge key by key,
         // arrays are replaced whole, and a null value deletes that key.
         def["Components"].merge_patch(patch);
- 
+
         // Targetting the inner key of Json file "DefRef"
         // If exists, overrides it with a fresh Json values
         def["Components"]["DefRef"] = Json{ {"Kind", kind}, {"Id", id}, {"Overrides", patch} };
@@ -125,10 +142,88 @@ namespace Ecs{
         ValidationS ctx{ db, errs, pos };
         if (!jc.CheckDefinition(def, ctx)) return std::nullopt;
 
-        //Spawns the entitiy, performing cleanup if necessary
-        return jc.Spawn(def, pos, errs);
+        //Returns the definition to be used seperately
+        return def;
     }
- 
+
+
+    /*
+        Function Spawns an instance
+     */
+    std::optional<Entity> SpawnInstance(Ecs::JsonScene& jc, Ecs::Database const& db, std::string const& kind, 
+    std::string const& id, Json const& overrides, ErrorChecker& errs)
+    {
+        auto definition = BuildInstance(jc, db, kind, id, overrides, errs);
+        if(!definition) return std::nullopt;
+        //Spawns the entitiy, performing cleanup if necessary
+        return jc.Spawn(*definition, kind + "." + id, errs);
+    }
+
+    /*
+      Hot reload: rebuilds one live entity from the (re)loaded Database, using its DefRef.
+      Returns false for entities without DefRef or whose definition is gone/invalid (left unchanged).
+  */
+    bool ReapplyDefinition(JsonScene& jc, Coordinator& world, Database const& db, Entity e, ErrorChecker& errs){
+        if (!world.HasComponent<DefRef>(e)) return false;
+
+        // This part copies the original, before reapply below overwrites DefRef
+        DefRef const ref = world.GetComponent<DefRef>(e);
+
+        auto def = BuildInstance(jc, db, ref.Kind, ref.Id, ref.Overrides, errs);
+
+        if (!def) return false;
+        return jc.Reapply(e, *def, ref.Kind + "." + ref.Id, errs);
+    }
+
+    /*
+        For HotReload. It reads every definition file listed in the manifest, validates them,
+        and if they all pass, rebuilds each live entity from its DefRef (runtime-only components
+        such as Contents are kept).
+    */
+    ReloadResult HotReload(JsonScene& jc, Coordinator& world, Database& db, std::string const& manifest,
+                           DefChecker check, TableRules const* tables)
+    {
+        ReloadResult rr;
+        if (!Load_All(manifest, db, rr.errs, std::move(check), tables)) return rr;   // db untouched on failure
+        rr.ok = true;
+
+        // Every entity as JSON before it is rebuilt (reflection: covers every registered component)
+        std::map<Entity, Json> before;
+        for (Entity e : world.LivingEntities()) before[e] = jc.Describe(e);
+
+        for (Entity e : world.LivingEntities())
+            if (ReapplyDefinition(jc, world, db, e, rr.errs)) ++rr.refreshed;
+
+        // Compare old vs new and record each field that changed
+        for (auto const& [e, old] : before)
+        {
+            if (!world.isAlive(e)) continue;
+            Json const patch = Json::diff(old, jc.Describe(e));   // a list of { op, path, value }
+            if (patch.empty()) continue;
+
+            std::string source = "?";
+            if (world.HasComponent<DefRef>(e)) {
+                auto const& ref = world.GetComponent<DefRef>(e);
+                source = ref.Kind + "." + ref.Id;
+            }
+
+            for (auto const& op : patch)
+            {
+                std::string const ptr  = op["path"].get<std::string>();   // "/Temp/Status"
+                std::string const kind = op["op"].get<std::string>();     // replace / add / remove
+
+                FieldChange c;
+                c.entity = e;
+                c.source = source;
+                c.field  = ptr.substr(1);                                  // "Temp/Status" -> "Temp.Status"
+                std::replace(c.field.begin(), c.field.end(), '/', '.');
+                if (kind != "add")    c.before = old.at(Json::json_pointer(ptr));
+                if (kind != "remove") c.after  = op["value"];
+                rr.changes.push_back(std::move(c));
+            }
+        }
+        return rr;
+    }
  
     /*
         Reads a scene file and spawns every instance listed in it.

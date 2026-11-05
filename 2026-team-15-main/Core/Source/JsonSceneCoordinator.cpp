@@ -211,6 +211,17 @@ namespace Ecs{
         return e;
     }
 
+    //For "hot reload"
+    bool JsonScene::Reapply(Entity e, Json const& def, std::string const& pos, ErrorChecker& errsvec){
+        if (!cord.isAlive(e)) {
+            errsvec.push_back(pos + ": entity " + std::to_string(e) + " is not alive");
+            return false;
+        }
+
+        Json const* comps = FindComponents(def, pos, errsvec);
+        return comps && ApplyComponents(e, *comps, pos, errsvec);
+    }
+
     /*
         Generates a complete world snapshot and serializes it out to a target JSON file path
     */

@@ -17,6 +17,11 @@ if(WIN32)
     target_link_libraries(ci_core PUBLIC libglew_static)
 endif()
 
+# Macro for Json desktop working directory
+if(NOT ANDROID)
+    target_compile_definitions(ci_core PUBLIC KOPI_JSON_DIR="${CMAKE_SOURCE_DIR}/Assets/Json/")
+endif()
+
 option(ENABLE_PROFILER "Enable scoped profiler" ON)
 if(ENABLE_PROFILER)
     target_compile_definitions(ci_core PUBLIC PROFILER_ENABLED)
@@ -26,4 +31,3 @@ target_include_directories(ci_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Header)
 target_link_libraries(ci_core PUBLIC nlohmann_json::nlohmann_json SDL3::SDL3)
 
 target_compile_definitions(ci_core PUBLIC KOPI_LOG_DIR="${CMAKE_BINARY_DIR}/logs")
-target_compile_definitions(ci_core PUBLIC PROFILER_ENABLED)

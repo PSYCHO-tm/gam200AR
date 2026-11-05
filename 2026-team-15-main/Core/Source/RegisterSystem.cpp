@@ -1,4 +1,5 @@
 #include "RegisterSystem.hpp"
+#include "PlatformLog.hpp"   // LOGI: console + log file on desktop, Logcat on Android
 
 namespace Ecs{
 
@@ -48,6 +49,27 @@ namespace Ecs{
         return tiers.empty() ? std::string{} : tiers.back().Grade;
     }
 
+    /*
+        Scenario ids sorted by "Order" (ties by id). Entries were validated by Load_All,
+        so converting them to ScenarioDef here is safe.
+    */
+    std::vector<std::string> ScenarioOrder(Database const& db)
+    {
+        std::vector<std::pair<int, std::string>> sorted;
+
+        auto table = db.tables.find(kScenarios);
+        if (table != db.tables.end()) {
+            for (auto const& [id, def] : table->second)
+                sorted.emplace_back(def.get<ScenarioDef>().Order, id);
+        }
+        std::sort(sorted.begin(), sorted.end());
+
+        std::vector<std::string> ids;
+        ids.reserve(sorted.size());
+        for (auto const& [order, id] : sorted) ids.push_back(id);
+        return ids;
+    }
+
 
     // ------------------------------------------------------------------
     //  DisplaySystem
@@ -57,10 +79,10 @@ namespace Ecs{
         auto list = entityVec;                                        // copy so we can sort
         std::sort(list.begin(), list.end());
 
-        std::cout << list.size() << " drink(s)\n";
+        // Reads the components straight from the ECS for every entity this system matches (Name + Temp)
+        LOGI("DisplaySystem: %zu drink(s)", list.size());
         for (Entity e : list)
-            std::cout << "  #" << e << "  " << world->GetComponent<Name>(e).Value
-                      << "  (" << world->GetComponent<Temp>(e).Status << ")\n";
+            LOGI("  #%u  %s  (%s)", e, world->GetComponent<Name>(e).Value.c_str(), world->GetComponent<Temp>(e).Status.c_str());
     }
 
 
@@ -145,6 +167,36 @@ namespace Ecs{
             }
         }
         return true;
+    }
+
+    /*
+        Starts the first scenario in play order (lowest "Order" in Scenarios.json)
+    */
+    bool ScenarioRunner::StartFirst(ErrorChecker& errs)
+    {
+        auto const order = ScenarioOrder(db);
+        if (order.empty()) {
+            errs.push_back("no scenarios defined in Scenarios.json");
+            return false;
+        }
+        return Start(order.front(), errs);
+    }
+
+    /*
+        Starts the scenario after the current one (wraps around). If nothing is running,
+        or the current scenario was removed by a hot reload, starts the first one.
+    */
+    bool ScenarioRunner::StartNext(ErrorChecker& errs)
+    {
+        auto const order = ScenarioOrder(db);
+        if (order.empty()) {
+            errs.push_back("no scenarios defined in Scenarios.json");
+            return false;
+        }
+
+        auto it = std::find(order.begin(), order.end(), current);
+        if (it == order.end() || ++it == order.end()) it = order.begin();
+        return Start(*it, errs);
     }
 
     /*

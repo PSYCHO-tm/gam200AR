@@ -33,6 +33,10 @@ Digipen ID:     zachary.y
 #include "RegisterSystem.hpp"
 #include <filesystem>
 
+#ifndef KOPI_JSON_DIR
+#define KOPI_JSON_DIR "Assets/Json/"
+#endif
+
 static void PrintErrors(char const* title, Ecs::ErrorChecker const& errs) { // edited by Raphael
        LOG_ERROR(title);
        for (auto const& m : errs) LOG_ERROR("   " << m);
@@ -106,6 +110,23 @@ namespace
     };
     World world;
 
+    // Shared by start-up (BuildWorld) and hot reload (ReloadDefinitions)
+    constexpr char kManifestFile[] = KOPI_JSON_DIR "JsonManifest.json";
+
+    Ecs::TableRules const& Tables()
+    {
+        static Ecs::TableRules tables;
+        if (tables.empty()) RegisterAllTables(tables);
+        return tables;
+    }
+
+    bool CheckDef(Ecs::Json const& def, Ecs::ValidationS const& ctx) { return world.scene.CheckDefinition(def, ctx); }
+
+    bool LoadDefinitions(Ecs::ErrorChecker& errs)
+    {
+        return Ecs::Load_All(kManifestFile, world.db, errs, CheckDef, &Tables());
+    }
+
     std::string gLastServe;
     // ARCore (and OpenGL) store 16 floats column-major for column vectors. That is exactly the memory layout of a
     // row-vector Matrix4x4, so the conversion is a plain copy.
@@ -165,10 +186,10 @@ namespace
 #endif
     }
 
-    void BuildWorld()
+    bool BuildWorld()
     {
 
-        if (world.built) return;                                   // once only
+        if (world.built) return true;                                   // once only
 
         world.coordinator.Init();
         RegisterAllComponents(world.scene);
@@ -183,29 +204,65 @@ namespace
         static Ecs::TableRules tables;          // rules for non-entity tables (TABLE_LIST)
         if (tables.empty()) RegisterAllTables(tables);
 
-        if (!Ecs::Load_All("Assets/Json/JsonManifest.json", world.db, errs, check, &tables))
+        if (!Ecs::Load_All(KOPI_JSON_DIR "JsonManifest.json", world.db, errs, check, &tables))
         {
             for (std::string const& e : errs) LOGE("ECS load error: %s", e.c_str());
-            return;
+            return false;
         }
 
-        auto made = Ecs::LoadScene(world.coordinator, world.scene, world.db, "Assets/Json/Scenes.json", errs);
+        auto made = Ecs::LoadScene(world.coordinator, world.scene, world.db, KOPI_JSON_DIR "Scenes.json", errs);
         if (!made)
         {
             for (std::string const& e : errs) LOGE("ECS scene error: %s", e.c_str());
-            return;
+            return false;
         }
         LOGI("ECS: %zu entities spawned", made->size());
         world.built = true;
 
         world.runner.emplace(world.coordinator, world.scene, world.db, *world.systems.recipeCheck);
-        if (!world.runner->Start("Tutorial", errs))
+        if (!world.runner->StartFirst(errs))   // first scenario by "Order" in Scenarios.json
         {
             for (std::string const& e : errs) 
             {
                 LOGE("ECS scenario error: %s", e.c_str());
             }
+
+            return false;
         }
+
+        return true;
+    }
+
+    void ReloadDefinitions(char const* str)
+    {
+        if (!world.built) {
+            LOGE("Reload skipped (%s): definitions never loaded, see the load error above", str);
+            return;
+        }
+
+        Ecs::ReloadResult r = Ecs::HotReload(world.scene, world.coordinator, world.db, kManifestFile, CheckDef, &Tables());
+        if (!r.ok) {                                                           // world.db is left untouched
+            LOGE("Reload rejected (%s), keeping previous data:", str);
+            for (auto const& e : r.errs) LOGE("   %s", e.c_str());
+            return;
+        }
+
+        for (auto const& e : r.errs) LOGE("Reload: %s", e.c_str());
+        LOGI("Reloaded definitions (%s): %zu entities refreshed, %zu field(s) changed", str, r.refreshed, r.changes.size());
+
+        // What the reload changed, grouped per entity, e.g.  entity 0 (DRINKS.Kopi):  Temp.Status: "Hot" -> "Warm"
+        Ecs::Entity last = static_cast<Ecs::Entity>(-1);
+        for (auto const& c : r.changes)
+        {
+            if (c.entity != last) { LOGI("  entity %u (%s):", c.entity, c.source.c_str()); last = c.entity; }
+
+            if (c.before.is_null())     LOGI("    + %s = %s", c.field.c_str(), c.after.dump().c_str());
+            else if (c.after.is_null()) LOGI("    - %s (was %s)", c.field.c_str(), c.before.dump().c_str());
+            else                        LOGI("    %s: %s -> %s", c.field.c_str(), c.before.dump().c_str(), c.after.dump().c_str());
+        }
+
+        // A real ECS system reading the reloaded components (not the log above): proves the systems see the new data
+        if (world.systems.display) world.systems.display->Show();
     }
 
     UI32 FormatEcs(char* buf, UI32 size)
@@ -219,6 +276,25 @@ namespace
         int n = std::snprintf(buf, size, "ECS: %u entities\n", world.coordinator.NumLiving());
         if (n < 0 || static_cast<UI32>(n) >= size) return 0;
         UI32 used = static_cast<UI32>(n);
+
+        // Running scenario, e.g. "Scenario: Normal (4 cups)"
+        if (world.runner && !world.runner->Current().empty())
+        {
+            int const s = std::snprintf(buf + used, size - used, "Scenario: %s (%zu cups)\n",
+                                        world.runner->Current().c_str(), world.runner->Orders().size());
+            if (s > 0 && static_cast<UI32>(s) < size - used) used += static_cast<UI32>(s);
+        }
+
+        // One line per drink, so a hot reload (F5) is visible on screen, e.g. "  #0 Kopi (Hot)"
+        for (Ecs::Entity e : world.coordinator.LivingEntities())
+        {
+            if (!world.coordinator.HasComponent<Name>(e) || !world.coordinator.HasComponent<Temp>(e)) continue;
+            int const m = std::snprintf(buf + used, size - used, "  #%u %s (%s)\n", e,
+                                        world.coordinator.GetComponent<Name>(e).Value.c_str(),
+                                        world.coordinator.GetComponent<Temp>(e).Status.c_str());
+            if (m < 0 || static_cast<UI32>(m) >= size - used) break;
+            used += static_cast<UI32>(m);
+        }
 
         return used;
     }
@@ -289,6 +365,19 @@ namespace
     {
         Core::mInput.ProcessInput(dt);
         UpdateAudio(Core::mInput.GetSnapshot());
+        if (Core::mInput.GetSnapshot().Is.Keys.Pressed.test(SDL_SCANCODE_F5)) ReloadDefinitions("F5");
+
+        // F6: next scenario in Scenarios.json order (includes scenarios added by a hot reload)
+        // F7: ask DisplaySystem what it sees right now (use before and after an F5 to compare)
+        if (Core::mInput.GetSnapshot().Is.Keys.Pressed.test(SDL_SCANCODE_F7) && world.built && world.systems.display)
+            world.systems.display->Show();
+
+        if (Core::mInput.GetSnapshot().Is.Keys.Pressed.test(SDL_SCANCODE_F6) && world.runner)
+        {
+            Ecs::ErrorChecker errs;
+            if (world.runner->StartNext(errs)) LOGI("Scenario started: %s", world.runner->Current().c_str());
+            else for (auto const& e : errs) LOGE("Scenario error: %s", e.c_str());
+        }
         ARTrackingState();
 #if defined(KOPI_HAS_GL)
         EquipmentScene::Get().Update(dt, Core::mInput.GetSnapshot(), gTracking, gView, gProjection, Core::viewportW,
@@ -303,28 +392,31 @@ Ecs::Coordinator& Core::GetWorld()
 
 bool Core::TryInitialize()
 {
-    bool ok = true;
     Timer::Init();
     Profiler::Init();
 
-    std::cout << "Current working directory: " << std::filesystem::current_path().string();
-    BuildWorld();
-    return ok;
+    LOGI("Working directory: %s", std::filesystem::current_path().string().c_str());
+    return BuildWorld();
 }
 
-void Core::Init()
+bool Core::Init()
 {
-    TryInitialize();
-	  audio.Init();
-	  //audio.LoadManifest("Json/Audio.json");
-	  audio.SetSfxVolume(0.8f);
-#if defined(__ANDROID__)
-    ArCameraInit();                  // camera texture + camera program (this is a new GL context)
-#endif
-#if defined(KOPI_HAS_GL)
-    Renderer::Get().Init();          // forgets old GPU handles, then builds the lit shader
-    EquipmentScene::Get().Init(BuildEquipmentLibrary());
-#endif
+    bool const ok = TryInitialize();
+    if (!ok) LOG_ERROR("Core::Init failed to initialize");
+
+	audio.Init();
+	//audio.LoadManifest("Json/Audio.json");
+	audio.SetSfxVolume(0.8f);
+
+    #if defined(__ANDROID__)
+        ArCameraInit();                  // camera texture + camera program (this is a new GL context)
+    #endif
+    #if defined(KOPI_HAS_GL)
+        Renderer::Get().Init();          // forgets old GPU handles, then builds the lit shader
+        EquipmentScene::Get().Init(BuildEquipmentLibrary());
+    #endif
+
+    return ok;
 }
 
 void Core::Start()

@@ -85,6 +85,11 @@ namespace Ecs{
     struct Rules<std::vector<GradeTier>>{
         static void Check(std::vector<GradeTier> const& tiers, ValidationS const& ctx);
     };
+
+    template <>
+    struct Rules<::Attributes>{
+        static void Check(::Attributes const& a, ValidationS const& ctx);
+    };
 }
  
 inline void to_json(Ecs::Json& j, Vector3D const& v)   { j = Ecs::Json::array({v.x, v.y, v.z}); }
@@ -112,7 +117,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Collider, minPoint, maxPoint, ha
  
 
 /*
- ---------------- Props: loose data no system queries by type ---------------- 
+ ---------------- Props: loose data no system queries by type ----------------
     Acts as a bucket for (visual paths, audio paths, flavour data).
     A new property is a JSON edit only, no C++ and no recompile.
     "Props": { "Visual": { "Model": "Models/water.obj" }, "Roast": "dark" }
@@ -222,17 +227,68 @@ namespace Ecs{
 
     /*
         [Factory]
-        Builds ONE entity from a definition in the Database. 
+        Builds ONE entity from a definition in the Database.
         kind      = kDrinks or kIngredients
         id        = the definition's key, e.g. "Kopi"
         overrides = changes to apply on top, keyed by component name, e.g.
 
         The new entity always gets a DefRef {Kind, Id, Overrule}.
         On any problem: returns nullopt, writes a message to errs, destroys
+
+        But this function is split into 2 versions, 1 for SpawnInstance (normal)
+        and the other is for Hot reloading(Reapply)
+    */
+    std::optional<Json> BuildInstance(JsonScene& jc, Database const& db, std::string const& kind,
+                                      std::string const& id, Json const& overrides, ErrorChecker& errs);
+
+    /*
+
     */
     std::optional<Entity> SpawnInstance(Ecs::JsonScene& jc, Database const& db, std::string const& kind, 
         std::string const& id, Json const& overrides, ErrorChecker& errs);
- 
+
+
+    /*
+       Hot reload: rebuilds one live entity from the (re)loaded Database, using its DefRef.
+       Returns false for entities without DefRef or whose definition is gone/invalid (left unchanged).
+   */
+    bool ReapplyDefinition(JsonScene& jc, Coordinator& world, Database const& db, Entity e, ErrorChecker& errs);
+
+
+    /*
+        Result of a hot reload.
+        ok == false : the new files were rejected (errors in errs), the old Database is still in use.
+        ok == true  : the new Database is in use; refreshed = entities rebuilt from their DefRef.
+                      errs can still hold per-entity problems (e.g. a definition that was removed).
+    */
+    /*
+        One field that a hot reload changed on a live entity, e.g.
+            entity 0, source "DRINKS.Kopi", field "Temp.Status", before "Hot", after "Warm"
+        before is null when the field/component was added, after is null when it was removed.
+    */
+    struct FieldChange {
+        Entity      entity = 0;
+        std::string source;   // the definition it came from (DefRef Kind.Id)
+        std::string field;    // "Component.field.subfield"
+        Json        before;
+        Json        after;
+    };
+
+    struct ReloadResult {
+        bool                     ok = false;
+        std::size_t              refreshed = 0;
+        ErrorChecker             errs;
+        std::vector<FieldChange> changes;   // exactly what the reload changed, entity by entity
+    };
+
+    /*
+        For HotReload. It reads every definition file listed in the manifest, validates them,
+        and if they all pass, rebuilds each live entity from its DefRef (runtime-only components
+        such as Contents are kept).
+    */
+    ReloadResult HotReload(JsonScene& jc, Coordinator& world, Database& db, std::string const& manifest,
+                           DefChecker check, TableRules const* tables);
+
     /*
         Offloads to SpawnInstance. Just no overrides
         Recap: Overrides let one definition produce instances that differ from each other, 
@@ -245,7 +301,8 @@ namespace Ecs{
     {
         return SpawnInstance(jc, db, kind, id, Json::object(), errs);
     }
- 
+
+
     /*
         Reads a scene file and spawns every instance listed in it.
         Adds to the world (it does not clear it): *Call world.DestroyAll() first if you

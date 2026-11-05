@@ -89,6 +89,12 @@
         taken from Grading Json
     */
     std::string GradeFor(double score, std::vector<GradeTier> const& tiers);
+
+    /*
+        Scenario ids in play order: sorted by their "Order" field in Scenarios.json (ties by id).
+        Nothing is hard-coded: a scenario added to the JSON shows up here automatically.
+    */
+    std::vector<std::string> ScenarioOrder(Database const& db);
 }
 
 
@@ -151,6 +157,22 @@ namespace Ecs{
             Spawns every order in the scenario (an empty cup each). Replaces any earlier run.
         */
         bool Start(std::string const& scenarioName, ErrorChecker& errs);
+
+        /*
+            Starts the first scenario in ScenarioOrder (the lowest "Order"). Replaces any earlier run.
+        */
+        bool StartFirst(ErrorChecker& errs);
+
+        /*
+            Starts the scenario after the current one in ScenarioOrder, wrapping around to the first.
+            Reads the order again each time, so scenarios added by a hot reload are included.
+        */
+        bool StartNext(ErrorChecker& errs);
+
+        /*
+            Id of the scenario that is running ("" if none)
+        */
+        std::string const& Current() const { return current; }
  
         /*
             Puts some of an ingredient into a drink's cup. Amounts add up if you call it twice.

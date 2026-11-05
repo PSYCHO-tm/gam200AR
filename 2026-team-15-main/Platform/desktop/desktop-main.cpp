@@ -297,7 +297,16 @@ int main(int, char**)
 	}
 	
 	// Code reaches here means edge cases checks passed. Windows shell loop begins.
-	Core::Init();
+	if (!Core::Init()){ // Exits app if init fails
+		TestRender::GraphicsCleanup();
+		Core::Exit();
+		SDL_GL_DestroyContext(glContext);
+		SDL_DestroyWindow(window);
+		SDL_Quit();
+
+		return -1;
+	}
+
 	bool running = true;
 	while (running)
 	{

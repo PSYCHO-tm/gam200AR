@@ -17,6 +17,11 @@ macro(get_sdl3)
         set(SDL_TEST_LIBRARY       OFF CACHE BOOL "" FORCE) # faster build, doesn't build SDL helper library
     endif()
 
+    # Reuse sources if it exists
+    if(EXISTS ${REPO_ROOT}/Extern/SDL3/CMakeLists.txt)
+        set(FETCHCONTENT_SOURCE_DIR_SDL3 ${REPO_ROOT}/Extern/SDL3)
+    endif()
+
     FetchContent_Declare(
         SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -30,6 +35,11 @@ endmacro()
 
 # --- Nlohmann Json ---
 macro(get_json)
+    # Reuse sources if it exists
+    if(EXISTS ${REPO_ROOT}/Extern/NlohmannJson/CMakeLists.txt)
+        set(FETCHCONTENT_SOURCE_DIR_NLOHMANNJSON ${REPO_ROOT}/Extern/NlohmannJson)
+    endif()
+
     FetchContent_Declare(
         NlohmannJson
         GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -67,6 +77,11 @@ endmacro()
 
 # --- Catch 2 ---
 macro(get_catch2)
+    # Reuse sources if it exists
+    if(EXISTS ${REPO_ROOT}/Extern/Catch2/CMakeLists.txt)
+        set(FETCHCONTENT_SOURCE_DIR_CATCH2 ${REPO_ROOT}/Extern/Catch2)
+    endif()
+
     FetchContent_Declare(
         Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -83,6 +98,11 @@ macro(get_glew)
     set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
     set(glew-cmake_BUILD_STATIC ON  CACHE BOOL "" FORCE)
     set(ONLY_LIBS ON CACHE BOOL "" FORCE)   # skip glewinfo/visualinfo executables
+
+    # Reuse sources if it exists
+    if(EXISTS ${REPO_ROOT}/Extern/glew/CMakeLists.txt)
+        set(FETCHCONTENT_SOURCE_DIR_GLEW ${REPO_ROOT}/Extern/glew)
+    endif()
 
     FetchContent_Declare(
         glew
