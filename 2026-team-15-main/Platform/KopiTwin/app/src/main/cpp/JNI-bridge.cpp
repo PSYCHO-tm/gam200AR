@@ -192,6 +192,13 @@ Java_com_example_kopitwin_NativeCore_nativeGetActions(JNIEnv* env, jobject)
     return env->NewStringUTF(buf);
 }
 
+// Sandbox: the guided lesson's state for the Kotlin HUD (LessonHud.kt), tab-separated. GL thread.
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_kopitwin_NativeCore_nativeLessonState(JNIEnv* env, jobject)
+{
+    return env->NewStringUTF(Core::GetLessonState().c_str());
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_kopitwin_NativeCore_nativeDoAction(JNIEnv* env, jobject, jstring actionId)
 {

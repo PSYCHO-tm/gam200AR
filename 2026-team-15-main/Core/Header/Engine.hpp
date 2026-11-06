@@ -16,6 +16,7 @@ Digipen ID:     zachary.y
 #include "Profiler.hpp"
 #include "Audio/audioSystem.hpp"
 #include <memory>
+#include <string>
 
 namespace Ecs{ class Coordinator; }
 
@@ -63,6 +64,8 @@ namespace Core
 
     UI32 GetOverlayText(char* buf, UI32 size);
     UI32 GetActionsText(char* buf, UI32 size);
+    // Sandbox: the guided lesson's state for the HUD, tab-separated (see EquipmentScene::LessonState).
+    std::string GetLessonState();
     void DoAction(char const* actionId);
     void PauseTime(bool p);
 }

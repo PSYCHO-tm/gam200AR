@@ -1,6 +1,7 @@
 #include "EquipmentScene.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <optional>
 #include <string>
@@ -14,6 +15,38 @@
 #include "PlatformLog.hpp"
 
 // The one scene. A function-local static: built on first use.
+namespace
+{
+    // Moller-Trumbore ray/triangle test: true if the ray hits triangle abc in front of its origin, with 'distance'
+    // set to how far along the (unit) direction the hit is. Works for both windings (no back-face rejection).
+    bool RayHitsTriangle(Raycast const& ray, Vector3D const& a, Vector3D const& b, Vector3D const& c, float& distance)
+    {
+        Vector3D const edge1 = b - a;
+        Vector3D const edge2 = c - a;
+        Vector3D const p     = ray.direction.CrossProduct(edge2);
+        float const    det   = edge1.DotProduct(p);
+        if (std::fabs(det) < 1e-12f)
+        {
+            return false; // the ray runs along the triangle's plane
+        }
+        float const    inverse = 1.0f / det;
+        Vector3D const s       = ray.origin - a;
+        float const    u       = s.DotProduct(p) * inverse;
+        if (u < 0.0f || u > 1.0f)
+        {
+            return false;
+        }
+        Vector3D const q = s.CrossProduct(edge1);
+        float const    v = ray.direction.DotProduct(q) * inverse;
+        if (v < 0.0f || u + v > 1.0f)
+        {
+            return false;
+        }
+        distance = edge2.DotProduct(q) * inverse;
+        return distance > 0.0f;
+    }
+}
+
 EquipmentScene& EquipmentScene::Get()
 {
     static EquipmentScene instance;
@@ -108,7 +141,8 @@ bool EquipmentScene::Init(EquipmentLibrary loadedLibrary)
         localModels.push_back(
             Matrix4x4::SRT(Vector3D{def.scale, def.scale, def.scale}, Vector3D{0.0f, def.yawDeg, 0.0f}, def.position));
     }
-    loadedMeshes.push_back(MakeMarkerMesh()); // always last: its index is library.items.size()
+    loadedMeshes.push_back(MakeMarkerMesh()); // index library.items.size()
+    loadedMeshes.push_back(MakeArrowMesh());  // index library.items.size() + 1: the lesson's pointer
     meshes = std::move(loadedMeshes);
     Renderer::Get().SetMeshes(meshes);
     loaded = true;
@@ -135,23 +169,56 @@ void EquipmentScene::Update(float /*dt*/, InputSnapshot const& input, bool track
     {
         Raycast const ray = ScreenPointToRay(input.TapX, input.TapY, viewportW, viewportH, view, projection);
 
-        // Nearest piece whose world box the ray enters (Collider does the box test, Raycast made the ray).
+        // Sandbox: precise picking. The box test alone picked the kettle when the cup was tapped, because the kettle's
+        // box (spout and handle included) covered the cup on screen. So the box is now only a quick first check, and
+        // the piece really hit is the one whose actual TRIANGLES the ray reaches first. Taps are rare, so testing a
+        // few thousand triangles per tap costs far less than a millisecond.
         std::optional<std::size_t> nearest;
         float                      nearestDistance = 0.0f;
-        for (std::size_t i = 0; i < library.items.size(); ++i)
+        for (std::size_t i = 0; i < library.items.size() && i < meshes.size(); ++i)
         {
-            float distance = 0.0f;
-            if (library.items[i].localBounds.Transformed(models[i]).IntersectsRay(ray, distance) &&
-                (!nearest || distance < nearestDistance))
+            float boxDistance = 0.0f;
+            if (!library.items[i].localBounds.Transformed(models[i]).IntersectsRay(ray, boxDistance))
             {
-                nearest         = i;
-                nearestDistance = distance;
+                continue; // misses the box: cannot hit the shape inside it
+            }
+            if (nearest && boxDistance > nearestDistance)
+            {
+                continue; // the box starts further away than a surface already hit
+            }
+            MeshData const& mesh = meshes[i];
+            for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3)
+            {
+                Vector3D const a = models[i].TransformPoint(mesh.vertices[mesh.indices[t]].pos);
+                Vector3D const b = models[i].TransformPoint(mesh.vertices[mesh.indices[t + 1]].pos);
+                Vector3D const c = models[i].TransformPoint(mesh.vertices[mesh.indices[t + 2]].pos);
+                float          distance = 0.0f;
+                if (RayHitsTriangle(ray, a, b, c, distance) && (!nearest || distance < nearestDistance))
+                {
+                    nearest         = i;
+                    nearestDistance = distance;
+                }
             }
         }
         selected = nearest;
         if (nearest)
         {
             LOGI("Tap (%.0f, %.0f) selected %s", input.TapX, input.TapY, library.items[*nearest].id.c_str());
+
+            // Guided lesson: the right piece moves to the next step, any other piece flashes "not that one".
+            if (lessonStep < lessonSteps.size())
+            {
+                if (library.items[*nearest].id == lessonSteps[lessonStep].target)
+                {
+                    ++lessonStep;
+                    wrongTapAt = -100.0f;
+                    LOGI("Lesson: step %zu of %zu done", lessonStep, lessonSteps.size());
+                }
+                else
+                {
+                    wrongTapAt = clock;
+                }
+            }
         }
         else
         {
@@ -239,8 +306,27 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
         }
     }
 
+    // The lesson's pointer: a light-blue arrow bobbing just above the piece the current step needs (Mabel's design).
+    // Unlit and never hidden by depth, so it always reads clearly.
+    std::optional<std::size_t> const target = LessonTargetIndex();
+    if (placed && stationShown && target && meshes.size() > library.items.size() + 1)
+    {
+        Collider const box = library.items[*target].localBounds.Transformed(models[*target]);
+        float const    bob = 0.008f * std::sin(clock * 4.0f);
+        Renderer::MeshDraw arrow;
+        arrow.meshIndex  = library.items.size() + 1;
+        arrow.model      = Matrix4x4::Translate((box.minPoint.x + box.maxPoint.x) * 0.5f, box.maxPoint.y + 0.02f + bob,
+                                                (box.minPoint.z + box.maxPoint.z) * 0.5f);
+        arrow.tint       = Vector3D{0.56f, 0.74f, 0.90f}; // Mabel's light blue
+        arrow.tintAmount = 1.0f;                           // plain colour, no lighting
+        arrow.alpha      = 0.95f;
+        arrow.occludable = false;
+        draws.push_back(arrow);
+    }
+
     // The debug square: red = a plane the code won't use, yellow = a good plane (holding steady), green = the anchor.
-    if (markerState != 0 && (!placed || stationShown) && meshes.size() > library.items.size())
+    // Hidden during a lesson: the design has no square, the arrow does that job.
+    if (markerState != 0 && lessonSteps.empty() && (!placed || stationShown) && meshes.size() > library.items.size())
     {
         Renderer::MeshDraw marker;
         marker.meshIndex = library.items.size();
@@ -257,6 +343,99 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
         return;
     }
     Renderer::Get().DrawMeshes(draws, view, projection);
+}
+
+// A downward arrow, 4.5 cm tall: a 6-sided cone (the head, tip at the origin) under a thin square shaft.
+MeshData EquipmentScene::MakeArrowMesh()
+{
+    MeshData       arrow;
+    float const    headRadius = 0.012f;
+    float const    headHeight = 0.022f;
+    float const    shaftHalf  = 0.004f;
+    float const    shaftTop   = 0.045f;
+    int const      sides      = 6;
+    Vector3D const up{0.0f, 1.0f, 0.0f};
+
+    // Head: tip, then a ring of corners at headHeight. Normals are not used (the arrow is drawn unlit).
+    arrow.vertices.push_back(Vertex{Vector3D{0.0f, 0.0f, 0.0f}, up, Vector2D{}});
+    for (int i = 0; i < sides; ++i)
+    {
+        float const a = 6.2831853f * static_cast<float>(i) / static_cast<float>(sides);
+        arrow.vertices.push_back(
+            Vertex{Vector3D{headRadius * std::cos(a), headHeight, headRadius * std::sin(a)}, up, Vector2D{}});
+    }
+    for (int i = 0; i < sides; ++i)
+    {
+        std::uint32_t const a = static_cast<std::uint32_t>(1 + i);
+        std::uint32_t const b = static_cast<std::uint32_t>(1 + (i + 1) % sides);
+        arrow.indices.insert(arrow.indices.end(), {0u, a, b}); // side of the cone
+        if (i > 0 && i + 1 < sides)
+        {
+            arrow.indices.insert(arrow.indices.end(), {1u, b, a}); // cap on top of the head
+        }
+    }
+
+    // Shaft: a box from the top of the head up to shaftTop.
+    std::uint32_t const base = static_cast<std::uint32_t>(arrow.vertices.size());
+    for (float y : {headHeight, shaftTop})
+    {
+        for (Vector2D const c : {Vector2D{-shaftHalf, -shaftHalf}, Vector2D{shaftHalf, -shaftHalf},
+                                 Vector2D{shaftHalf, shaftHalf}, Vector2D{-shaftHalf, shaftHalf}})
+        {
+            arrow.vertices.push_back(Vertex{Vector3D{c.x, y, c.y}, up, Vector2D{}});
+        }
+    }
+    for (std::uint32_t i = 0; i < 4; ++i)
+    {
+        std::uint32_t const j = (i + 1) % 4;
+        arrow.indices.insert(arrow.indices.end(), {base + i, base + j, base + 4 + j, base + i, base + 4 + j, base + 4 + i});
+    }
+    arrow.indices.insert(arrow.indices.end(), {base + 4, base + 5, base + 6, base + 4, base + 6, base + 7}); // top
+    return arrow;
+}
+
+void EquipmentScene::LoadLesson(std::string name, std::string mode, std::vector<LessonStep> steps)
+{
+    lessonName  = std::move(name);
+    lessonMode  = std::move(mode);
+    lessonSteps = std::move(steps);
+    lessonStep  = 0;
+    LOGI("Lesson '%s' loaded: %zu steps", lessonName.c_str(), lessonSteps.size());
+}
+
+std::optional<std::size_t> EquipmentScene::LessonTargetIndex() const
+{
+    if (lessonStep >= lessonSteps.size())
+    {
+        return std::nullopt;
+    }
+    for (std::size_t i = 0; i < library.items.size() && i < models.size(); ++i)
+    {
+        if (library.items[i].id == lessonSteps[lessonStep].target)
+        {
+            return i;
+        }
+    }
+    return std::nullopt; // the step names a piece that is not in the scene
+}
+
+std::string EquipmentScene::LessonState() const
+{
+    char const  sep   = 9; // tab: the HUD splits on it, and no lesson text contains one
+    bool const  done  = !lessonSteps.empty() && lessonStep >= lessonSteps.size();
+    std::string state = (!placed || !stationShown) ? "scan" : (done ? "done" : "step");
+    LessonStep const empty{};
+    LessonStep const& step = (lessonStep < lessonSteps.size()) ? lessonSteps[lessonStep] : empty;
+    bool const wrong = (clock - wrongTapAt) < 1.5f;
+
+    std::string out = state;
+    for (std::string const& field : {std::to_string(lessonStep + 1), std::to_string(lessonSteps.size()), step.section,
+                                     step.title, step.hint, lessonName, lessonMode, std::string(wrong ? "1" : "0")})
+    {
+        out += sep;
+        out += field;
+    }
+    return out;
 }
 
 void EquipmentScene::DrawLoader(float seconds, int viewportW, int viewportH)

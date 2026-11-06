@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity() {
 
     private var arPaused = false
     private lateinit var pauseButton: Button
+    private lateinit var lessonHud: LessonHud   // sandbox: Mabel's guided-lesson screen
     private var overlayTick = 0
     private lateinit var glView: GLSurfaceView
     private lateinit var infoText: TextView
@@ -152,10 +153,11 @@ class MainActivity : AppCompatActivity() {
         statsParams.topMargin = 100
 
         pauseButton = Button(this).apply {
-            text = "PauseTime"
+            text = "II"
             setOnClickListener {
                 arPaused = !arPaused
-                text = if (arPaused) "Resume" else "Pause"
+                text = if (arPaused) "▶" else "II"
+                lessonHud.setPaused(arPaused)
                 glView.queueEvent {
                     if (arPaused) nativeArStop() else nativeArResume()
                 }
@@ -168,14 +170,6 @@ class MainActivity : AppCompatActivity() {
             FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; bottomMargin = 150 }
 
-        val buttonParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.BOTTOM or Gravity.END
-            rightMargin = 32
-            bottomMargin = 412
-        }
 
         val audioSet = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -208,6 +202,11 @@ class MainActivity : AppCompatActivity() {
                         this@MainActivity.runOnUiThread { infoText.text = touch }
                     }
 
+                    if (overlayTick % 6 == 0) {                       // sandbox: Mabel's lesson HUD, ~5 Hz
+                        val lesson = NativeCore.nativeLessonState()   // GL thread
+                        this@MainActivity.runOnUiThread { lessonHud.update(lesson) }
+                    }
+
                     if (overlayTick % 6 == 0) {
                         val actions = NativeCore.nativeGetActions()          // GL thread
                         if (actions != lastActions) {                        // rebuild buttons only when the list changes
@@ -230,14 +229,33 @@ class MainActivity : AppCompatActivity() {
 
         val layout = FrameLayout(this)
         layout.addView(glView)
-        layout.addView(actionBar, actionParams)
+
+        // Sandbox: the developer views (stats, touch readout, audio test buttons, action buttons) live in one layer,
+        // hidden by default so the screen looks like Mabel's design. The small DBG button shows them again.
+        val debugLayer = FrameLayout(this).apply { visibility = View.GONE }
+        debugLayer.addView(actionBar, actionParams)
         // The blue stats box with the red touch box right under it: stacked, so they never overlap whatever the text length.
         val debugColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         debugColumn.addView(statsText)
         debugColumn.addView(infoText)
-        layout.addView(debugColumn, statsParams)
-        layout.addView(pauseButton, buttonParams)
-        layout.addView(buildAudioPanel(), audioSet)
+        debugLayer.addView(debugColumn, statsParams)
+        debugLayer.addView(buildAudioPanel(), audioSet)
+        layout.addView(debugLayer, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT))
+
+        lessonHud = LessonHud(this)
+        layout.addView(lessonHud.root, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT))
+        lessonHud.attachPause(pauseButton)   // the prototype's square pause button, top right
+
+        val debugToggle = Button(this).apply {
+            text = "DBG"
+            textSize = 10f
+            alpha = 0.5f
+            setOnClickListener { debugLayer.visibility = if (debugLayer.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
+        }
+        layout.addView(debugToggle, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.START or Gravity.CENTER_VERTICAL))
 
         setContentView(layout)
     }
@@ -257,7 +275,8 @@ class MainActivity : AppCompatActivity() {
         NativeCore.nativeAudioResume()
         startArcore()
         arPaused = false
-        pauseButton.text = "Pause"
+        pauseButton.text = "II"
+        if (::lessonHud.isInitialized) lessonHud.setPaused(false)
         glView.onResume()
         glView.queueEvent {
             NativeCore.nativeTogglePause(arPaused)

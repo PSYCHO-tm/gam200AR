@@ -1,0 +1,17 @@
+{
+  "LESSON": {
+    "Name": "Kopi",
+    "Subtitle": "Condensed milk and sugar",
+    "Mode": "GUIDED",
+    "Steps": [
+      { "Section": "BREW",    "Title": "Add coffee powder",       "Target": "SockFilter",       "Hint": "Coffee powder goes into the cloth sock first. Tap the sock filter." },
+      { "Section": "BREW",    "Title": "Pour hot water",          "Target": "Kettle",           "Hint": "Pour hot water from the kettle over the powder. Tap the kettle." },
+      { "Section": "BREW",    "Title": "Brew, then lift the sock", "Target": "SockFilter",      "Hint": "Let it brew, then lift the sock out of the pot. Tap the sock filter." },
+      { "Section": "PREPARE", "Title": "Place the cup",           "Target": "Cup",              "Hint": "Set a clean glass cup on the counter. Tap the cup." },
+      { "Section": "PREPARE", "Title": "Add condensed milk",      "Target": "CondensedMilkTin", "Hint": "Add condensed milk to the bottom of the cup. Tap the condensed milk tin." },
+      { "Section": "PREPARE", "Title": "Add sugar",               "Target": "Cup",              "Hint": "Add a spoon of sugar into the cup. Tap the cup." },
+      { "Section": "PREPARE", "Title": "Pour the kopi",           "Target": "SockFilter",       "Hint": "Pour the brewed kopi from the pot into the cup. Tap the sock filter." },
+      { "Section": "PREPARE", "Title": "Stir and serve",          "Target": "Cup",              "Hint": "Stir until the milk mixes in, then serve. Tap the cup." }
+    ]
+  }
+}

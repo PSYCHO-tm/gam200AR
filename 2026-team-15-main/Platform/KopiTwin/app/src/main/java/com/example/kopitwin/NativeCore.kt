@@ -15,6 +15,7 @@ object NativeCore {
     external fun nativeGetActions(): String
     external fun nativeDoAction(actionId: String)
     external fun nativeTogglePause(paused: Boolean)
+    external fun nativeLessonState(): String   // sandbox: guided lesson, tab-separated (see LessonHud.kt)
 
     external fun nativeAudioKey(id: Int)
     external fun nativeAudioPause()

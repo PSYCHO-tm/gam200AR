@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "Geometry.hpp"
@@ -64,6 +65,41 @@ public:
     // For the buttons and text that will be added later: the equipment, and which piece (if any) is selected.
     EquipmentLibrary const&    GetLibrary() const { return library; }
     std::optional<std::size_t> GetSelected() const { return selected; }
+
+    // ---- Guided lesson (sandbox, Mabel's Figma flow) -------------------------------------------------------------
+    // One step of the lesson: what to do, the hint under it, and which piece (Equipment.json key) to tap.
+    struct LessonStep
+    {
+        std::string section; // "BREW" / "PREPARE"
+        std::string title;   // "Add coffee powder"
+        std::string hint;    // the longer help line
+        std::string target;  // equipment id, e.g. "SockFilter"
+    };
+
+    // The lesson from Assets/Json/Lesson.json (read in Engine.cpp). Starts at step 1.
+    void LoadLesson(std::string name, std::string mode, std::vector<LessonStep> steps);
+
+    // Real time in seconds (keeps running while game time is held): drives the arrow's bob.
+    void SetClock(float seconds) { clock = seconds; }
+
+    // Everything the Kotlin HUD needs, as tab-separated fields:
+    // state (scan / step / done), step number (1-based), step count, section, title, hint, lesson name, mode,
+    // and 1 if the last tap hit the wrong piece in the last 1.5 s (else 0).
+    std::string LessonState() const;
+
+private:
+    static MeshData MakeArrowMesh(); // a small arrow pointing down (-y), tip at the origin
+
+    std::optional<std::size_t> LessonTargetIndex() const; // the current step's piece in library.items, if it exists
+
+    std::string             lessonName;
+    std::string             lessonMode;
+    std::vector<LessonStep> lessonSteps;
+    std::size_t             lessonStep = 0;     // 0-based; == size() when the lesson is done
+    float                   clock = 0.0f;
+    float                   wrongTapAt = -100.0f; // clock time of the last tap on the wrong piece
+
+public:
 
 private:
     EquipmentScene() = default; // only Get() makes one

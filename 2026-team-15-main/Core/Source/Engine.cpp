@@ -429,9 +429,50 @@ bool Core::Init()
     #if defined(KOPI_HAS_GL)
         Renderer::Get().Init();          // forgets old GPU handles, then builds the lit shader
         EquipmentScene::Get().Init(BuildEquipmentLibrary());
+
+        // Sandbox: Mabel's guided lesson (Assets/Json/Lesson.json). Once per app run, not per GL context, so a
+        // trip to the background does not restart the lesson.
+        static bool lessonLoaded = false;
+        if (!lessonLoaded)
+        {
+            lessonLoaded = true;
+            try
+            {
+                auto const file = Ecs::DeserializePath(KOPI_JSON_DIR "Lesson.json");
+                if (file && file->contains("LESSON"))
+                {
+                    Ecs::Json const& lesson = (*file)["LESSON"];
+                    std::vector<EquipmentScene::LessonStep> steps;
+                    for (Ecs::Json const& s : lesson.value("Steps", Ecs::Json::array()))
+                    {
+                        steps.push_back({s.value("Section", std::string{}), s.value("Title", std::string{}),
+                                         s.value("Hint", std::string{}), s.value("Target", std::string{})});
+                    }
+                    EquipmentScene::Get().LoadLesson(lesson.value("Name", std::string{"Lesson"}),
+                                                     lesson.value("Mode", std::string{"GUIDED"}), std::move(steps));
+                }
+                else
+                {
+                    LOGE("Lesson.json missing or has no LESSON: no guided lesson");
+                }
+            }
+            catch (std::exception const& e)
+            {
+                LOGE("Lesson.json is malformed (%s): no guided lesson", e.what());
+            }
+        }
     #endif
 
     return ok;
+}
+
+std::string Core::GetLessonState()
+{
+#if defined(KOPI_HAS_GL)
+    return EquipmentScene::Get().LessonState();
+#else
+    return "scan";
+#endif
 }
 
 void Core::Start()
@@ -497,6 +538,7 @@ void Core::Render()
 #if defined(KOPI_HAS_GL)
     static float loaderSeconds = 0.0f;
     loaderSeconds += unscaledDt; // real time: the loader keeps spinning while the game clock is paused
+    EquipmentScene::Get().SetClock(loaderSeconds); // same real-time clock for the lesson arrow's bob
 #if defined(__ANDROID__)
     // The station only when it can be trusted (placed, tracking, card not covered); otherwise the loader in the middle.
     bool const stationShown = gStationShown; // decided in ARTrackingState, which also holds game time
