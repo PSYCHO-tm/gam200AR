@@ -331,6 +331,23 @@ namespace
             if (world.coordinator.HasComponent<Props>(e))
             {
                 auto const& values = world.coordinator.GetComponent<Props>(e).Values;
+
+                // Sandbox: the piece's colour from Props.Visual.Colour ([r, g, b], 0..1), instead of the palette.
+                auto const visual = values.find("Visual");
+                if (visual != values.end() && visual->second.is_object() && visual->second.contains("Colour"))
+                {
+                    auto const& c = visual->second["Colour"];
+                    if (c.is_array() && c.size() == 3)
+                    {
+                        def.colour    = Vector3D{c[0].get<float>(), c[1].get<float>(), c[2].get<float>()};
+                        def.hasColour = true;
+                    }
+                }
+                if (visual != values.end() && visual->second.is_object())
+                {
+                    def.alpha = visual->second.value("Alpha", 1.0f);
+                }
+
                 auto        found  = values.find("Interactions");
                 if (found != values.end() && found->second.is_object())
                 {
@@ -443,10 +460,31 @@ bool Core::Init()
                 {
                     Ecs::Json const& lesson = (*file)["LESSON"];
                     std::vector<EquipmentScene::LessonStep> steps;
+                    auto const vec3 = [](Ecs::Json const& j, char const* key, Vector3D fallback) {
+                        if (!j.contains(key) || !j[key].is_array() || j[key].size() != 3) return fallback;
+                        return Vector3D{j[key][0].get<float>(), j[key][1].get<float>(), j[key][2].get<float>()};
+                    };
                     for (Ecs::Json const& s : lesson.value("Steps", Ecs::Json::array()))
                     {
-                        steps.push_back({s.value("Section", std::string{}), s.value("Title", std::string{}),
-                                         s.value("Hint", std::string{}), s.value("Target", std::string{})});
+                        EquipmentScene::LessonStep step;
+                        step.section = s.value("Section", std::string{});
+                        step.title   = s.value("Title", std::string{});
+                        step.hint    = s.value("Hint", std::string{});
+                        step.target  = s.value("Target", std::string{});
+                        if (s.contains("Animation") && s["Animation"].is_object())
+                        {
+                            Ecs::Json const& a     = s["Animation"];
+                            step.hasAnimation      = true;
+                            step.animation.type    = a.value("Type", std::string{});
+                            step.animation.piece   = a.value("Piece", std::string{});
+                            step.animation.into    = a.value("Into", std::string{});
+                            step.animation.colour  = vec3(a, "Colour", step.animation.colour);
+                            step.animation.level   = a.value("Level", step.animation.level);
+                            step.animation.tilt    = a.value("Tilt", step.animation.tilt);
+                            step.animation.seconds = a.value("Seconds", step.animation.seconds);
+                            step.animation.to      = vec3(a, "To", step.animation.to);
+                        }
+                        steps.push_back(std::move(step));
                     }
                     EquipmentScene::Get().LoadLesson(lesson.value("Name", std::string{"Lesson"}),
                                                      lesson.value("Mode", std::string{"GUIDED"}), std::move(steps));

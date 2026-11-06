@@ -67,13 +67,33 @@ public:
     std::optional<std::size_t> GetSelected() const { return selected; }
 
     // ---- Guided lesson (sandbox, Mabel's Figma flow) -------------------------------------------------------------
+    // What a step shows after the right tap (Lesson.json "Animation"). Kinds:
+    //   Pour     - 'piece' moves over 'into', tips by 'tilt' degrees, a stream runs, 'into' fills to 'level' in 'colour'
+    //   Dip      - 'piece' lowers into 'into', brews ('into' turns 'colour'), lifts out and drips, goes back
+    //   Sprinkle - 'piece' moves over 'into' and tips; grains in 'colour' fall with gravity and land in it
+    //   Place    - 'piece' moves (with a little arc) to 'to' and stays there
+    //   Stir     - 'piece' (the spoon) stands up in 'into' and circles; 'into' turns 'colour'
+    struct LessonAnimation
+    {
+        std::string type;
+        std::string piece;            // the piece that moves; empty = the step's target
+        std::string into;             // the piece acted on
+        Vector3D    colour{0.5f, 0.3f, 0.1f};
+        float       level   = 0.0f;   // Pour: how full 'into' ends up (0..1 of its inside height)
+        float       tilt    = 60.0f;  // degrees the piece tips
+        float       seconds = 3.0f;
+        Vector3D    to{0.0f, 0.0f, 0.0f}; // Place: the new spot, anchor-local metres
+    };
+
     // One step of the lesson: what to do, the hint under it, and which piece (Equipment.json key) to tap.
     struct LessonStep
     {
-        std::string section; // "BREW" / "PREPARE"
-        std::string title;   // "Add coffee powder"
-        std::string hint;    // the longer help line
-        std::string target;  // equipment id, e.g. "SockFilter"
+        std::string     section; // "BREW" / "PREPARE"
+        std::string     title;   // "Add coffee powder"
+        std::string     hint;    // the longer help line
+        std::string     target;  // equipment id, e.g. "SockFilter"
+        bool            hasAnimation = false;
+        LessonAnimation animation;
     };
 
     // The lesson from Assets/Json/Lesson.json (read in Engine.cpp). Starts at step 1.
@@ -91,6 +111,47 @@ private:
     static MeshData MakeArrowMesh(); // a small arrow pointing down (-y), tip at the origin
 
     std::optional<std::size_t> LessonTargetIndex() const; // the current step's piece in library.items, if it exists
+    std::optional<std::size_t> PieceIndex(std::string const& id) const;
+
+    // ---- Animation (sandbox) -------------------------------------------------------------------------------------
+    static MeshData MakeCylinderMesh(); // radius 1, from y = 0 to y = 1, closed: liquids and the pour stream
+    static MeshData MakeGrainMesh();    // a tiny cube, 1 unit wide: powder and sugar grains, drips
+
+    void UpdateAnimation(float dt);     // advances the playing step animation, its particles and liquids
+    void FinishAnimation();             // puts everything at rest and moves the lesson on
+    void DrawLiquidsAndEffects();       // adds liquids, the stream and the grains to 'draws'
+
+    // A container's inside, from its mesh box: radius, floor height and usable height (piece-local metres).
+    void ContainerInside(std::size_t i, float& radius, float& floor, float& height) const;
+
+    struct Liquid
+    {
+        float    level = 0.0f; // 0..1 of the inside height
+        Vector3D colour{0.75f, 0.85f, 0.95f};
+    };
+    struct Grain
+    {
+        Vector3D position;  // world metres
+        Vector3D velocity;  // metres per second
+        Vector3D colour;
+        float    floorY;    // world height where it lands and disappears
+    };
+
+    std::vector<Vector3D> basePositions; // each piece's resting spot (anchor-local); Place changes it
+    std::vector<Vector3D> animOffset;    // this frame's extra move (anchor-local)
+    std::vector<float>    animTilt;      // degrees tipped (its local +x side goes down)
+    std::vector<float>    animTurn;      // degrees turned about y so its +x side faces where it pours
+    std::vector<Liquid>   liquids;       // per piece; only containers ever get a level
+    std::vector<Grain>    grains;
+    bool                  animating = false;
+    float                 animTime  = 0.0f; // seconds into the playing animation (game time: holds while hidden)
+    bool                  streamOn  = false;
+    Vector3D              streamTop;
+    Vector3D              streamBottom;
+    Vector3D              streamColour;
+    float                 grainSpawn = 0.0f; // fractional grains owed to the spawner
+    Liquid                animStartInto;     // the 'into' liquid when the animation started
+    Liquid                animStartPiece;    // the moving piece's liquid when it started (a pot that pours)
 
     std::string             lessonName;
     std::string             lessonMode;

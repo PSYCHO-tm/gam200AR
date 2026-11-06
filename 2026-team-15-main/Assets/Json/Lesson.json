@@ -4,14 +4,37 @@
     "Subtitle": "Condensed milk and sugar",
     "Mode": "GUIDED",
     "Steps": [
-      { "Section": "BREW",    "Title": "Add coffee powder",       "Target": "SockFilter",       "Hint": "Coffee powder goes into the cloth sock first. Tap the sock filter." },
-      { "Section": "BREW",    "Title": "Pour hot water",          "Target": "Kettle",           "Hint": "Pour hot water from the kettle over the powder. Tap the kettle." },
-      { "Section": "BREW",    "Title": "Brew, then lift the sock", "Target": "SockFilter",      "Hint": "Let it brew, then lift the sock out of the pot. Tap the sock filter." },
-      { "Section": "PREPARE", "Title": "Place the cup",           "Target": "Cup",              "Hint": "Set a clean glass cup on the counter. Tap the cup." },
-      { "Section": "PREPARE", "Title": "Add condensed milk",      "Target": "CondensedMilkTin", "Hint": "Add condensed milk to the bottom of the cup. Tap the condensed milk tin." },
-      { "Section": "PREPARE", "Title": "Add sugar",               "Target": "Cup",              "Hint": "Add a spoon of sugar into the cup. Tap the cup." },
-      { "Section": "PREPARE", "Title": "Pour the kopi",           "Target": "SockFilter",       "Hint": "Pour the brewed kopi from the pot into the cup. Tap the sock filter." },
-      { "Section": "PREPARE", "Title": "Stir and serve",          "Target": "Cup",              "Hint": "Stir until the milk mixes in, then serve. Tap the cup." }
+      { "Section": "BREW", "Title": "Add coffee powder", "Target": "CoffeeBag",
+        "Hint": "Coffee powder is in the brown bag. Tap the bag to tip it into the cloth sock.",
+        "Animation": { "Type": "Sprinkle", "Piece": "CoffeeBag", "Into": "SockFilter", "Colour": [0.30, 0.18, 0.09], "Tilt": 120, "Seconds": 3.5 } },
+
+      { "Section": "BREW", "Title": "Pour hot water", "Target": "Kettle",
+        "Hint": "Pour hot water from the kettle into the kopi pot. Tap the kettle.",
+        "Animation": { "Type": "Pour", "Piece": "Kettle", "Into": "KopiPot", "Colour": [0.78, 0.88, 0.97], "Level": 0.65, "Tilt": 50, "Seconds": 4.0 } },
+
+      { "Section": "BREW", "Title": "Brew, then lift the sock", "Target": "SockFilter",
+        "Hint": "Dip the sock into the hot water to brew, then lift it out. Tap the sock filter.",
+        "Animation": { "Type": "Dip", "Piece": "SockFilter", "Into": "KopiPot", "Colour": [0.24, 0.13, 0.06], "Seconds": 5.0 } },
+
+      { "Section": "PREPARE", "Title": "Place the cup", "Target": "Cup",
+        "Hint": "Set the glass cup in front of the kopi pot. Tap the cup.",
+        "Animation": { "Type": "Place", "Piece": "Cup", "To": [0.02, 0.0, 0.08], "Seconds": 1.6 } },
+
+      { "Section": "PREPARE", "Title": "Add condensed milk", "Target": "CondensedMilkTin",
+        "Hint": "Pour condensed milk into the bottom of the cup. Tap the condensed milk tin.",
+        "Animation": { "Type": "Pour", "Piece": "CondensedMilkTin", "Into": "Cup", "Colour": [0.96, 0.93, 0.82], "Level": 0.22, "Tilt": 105, "Seconds": 3.5 } },
+
+      { "Section": "PREPARE", "Title": "Add sugar", "Target": "SugarBowl",
+        "Hint": "Add a spoon of sugar into the cup. Tap the sugar bowl.",
+        "Animation": { "Type": "Sprinkle", "Piece": "Spoon", "Into": "Cup", "Colour": [1.0, 1.0, 0.98], "Tilt": 35, "Seconds": 3.0 } },
+
+      { "Section": "PREPARE", "Title": "Pour the kopi", "Target": "KopiPot",
+        "Hint": "Pour the brewed kopi from the pot into the cup. Tap the kopi pot.",
+        "Animation": { "Type": "Pour", "Piece": "KopiPot", "Into": "Cup", "Colour": [0.24, 0.13, 0.06], "Level": 0.85, "Tilt": 70, "Seconds": 4.0 } },
+
+      { "Section": "PREPARE", "Title": "Stir and serve", "Target": "Spoon",
+        "Hint": "Stir until the milk mixes in, then serve. Tap the spoon.",
+        "Animation": { "Type": "Stir", "Piece": "Spoon", "Into": "Cup", "Colour": [0.55, 0.36, 0.20], "Seconds": 4.0 } }
     ]
   }
 }

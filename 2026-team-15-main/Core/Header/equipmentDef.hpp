@@ -29,6 +29,9 @@ struct EquipmentDef
     float                       scale  = 1.0f;
     std::vector<InteractionDef> interactions;
     Collider                    localBounds; // the mesh's box, filled in by whoever loads the mesh
+    Vector3D                    colour{0.8f, 0.8f, 0.8f}; // sandbox: Props.Visual.Colour from Equipment.json
+    bool                        hasColour = false;        // false = use the placeholder palette
+    float                       alpha = 1.0f;             // sandbox: Props.Visual.Alpha, below 1 = see-through (glass)
 };
 
 class EquipmentLibrary
