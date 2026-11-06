@@ -20,102 +20,101 @@ Renderer& Renderer::Get()
 bool Renderer::Init()
 {
     ContextLost(); // a new context means every old GPU handle is invalid
-    return litShader.Load(gLitVert, gLitFrag);
+    return LitShader.Load(gLitVert, gLitFrag);
 }
 
 // The context is already gone, so nothing may call GL here: forget the handles and mark everything for re-upload.
 void Renderer::ContextLost()
 {
-    litShader.ContextLost();
-    meshes.clear();     // Mesh destructors don't call GL, so this only forgets the handles
-    needsUpload = true; // the CPU copy survived: upload it again on the next draw
+    LitShader.ContextLost();
+    GpuMeshes.clear(); // Mesh destructors don't call GL, so this only forgets the handles; the CPU copies re-upload
+                       // next draw
 }
 
 // The app is closing and the context is still alive: really free the GPU meshes and the shader program.
 void Renderer::Shutdown()
 {
     FreeMeshes();
-    litShader.Destroy();
-    needsUpload = true;
+    LitShader.Destroy();
 }
 
-// Takes the CPU mesh list (moved in, no copy). The GPU upload waits for the next DrawMeshes, which is always on the
-// GL thread with a live context.
-void Renderer::SetMeshes(std::vector<MeshData> newMeshes)
+// Stores the CPU mesh (moved in, no copy) and returns its position, which is its id from now on. The GPU upload waits
+// for the next DrawMeshes, which is always on the GL thread with a live context.
+Renderer::MeshId Renderer::AddMesh(MeshData mesh)
 {
-    meshData    = std::move(newMeshes);
-    needsUpload = true;
+    CpuMeshes.push_back(std::move(mesh));
+    return CpuMeshes.size() - 1;
 }
 
 // Deletes each mesh's GPU buffers, then empties the list.
 void Renderer::FreeMeshes()
 {
-    for (Mesh& mesh : meshes)
+    for (Mesh& mesh : GpuMeshes)
     {
         mesh.Destroy();
     }
-    meshes.clear();
+    GpuMeshes.clear();
 }
 
-// One GPU Mesh per MeshData, in the same order, so a MeshDraw's meshIndex points at the same model in both lists.
+// One GPU Mesh per MeshData, in the same order, so a MeshId points at the same model in both lists. Only the meshes
+// not uploaded yet are sent: new ones from AddMesh, or all of them after a context loss emptied 'meshes'.
 void Renderer::UploadMeshes()
 {
-    FreeMeshes();
-    meshes.reserve(meshData.size());
-    for (MeshData const& data : meshData)
+    GpuMeshes.reserve(CpuMeshes.size());
+    for (std::size_t i = GpuMeshes.size(); i < CpuMeshes.size(); ++i)
     {
-        meshes.emplace_back().Upload(data);
+        GpuMeshes.emplace_back().Upload(CpuMeshes[i]);
     }
-    needsUpload = false;
 }
 
 // Borrows ARCore's depth texture for this frame's draws. No transform = no depth (texture 0), so a bad call can
 // never leave the shader reading a half-set transform.
 void Renderer::SetDepth(unsigned int texture, float const* uvTransform)
 {
-    depthTexture = (uvTransform != nullptr) ? texture : 0;
-    if (depthTexture != 0)
+    DepthTexture = (uvTransform != nullptr) ? texture : 0;
+    if (DepthTexture != 0)
     {
-        std::copy(uvTransform, uvTransform + 9, depthUv);
+        std::copy(uvTransform, uvTransform + 9, DepthUv);
     }
 }
 
 // The program for a material's shader. Only Lit exists today; FreeType text adds its own case here.
-Shader& Renderer::ShaderFor(ShaderKind kind)
+Shader& Renderer::ShaderFor(SHADER_KIND kind)
 {
     switch (kind)
     {
-    case ShaderKind::Lit:
-        return litShader;
+        case SHADER_KIND::LIT:
+            return LitShader;
     }
-    return litShader; // unreachable with a valid ShaderKind; keeps every path returning a shader
+    return LitShader; // unreachable with a valid ShaderKind; keeps every path returning a shader
 }
 
-// Draws every item with the shader its material names. Steps: upload if needed -> GL state (depth test, blending) -> depth picture
+// Draws every item with the shader its material names. Steps: upload if needed -> GL state (depth test, blending) ->
+// depth picture
 // -> per item: matrices and colours as uniforms, one draw call -> put the GL state back the way it was found.
 void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& view, Matrix4x4 const& projection)
 {
-    if (!litShader.IsValid())
+    if (!LitShader.IsValid())
     {
         return; // the shader failed to build (already logged): drawing would only produce GL errors
     }
-    if (needsUpload)
+    if (GpuMeshes.size() < CpuMeshes.size())
     {
-        UploadMeshes();
+        UploadMeshes(); // a module added meshes, or the context was lost
     }
 
     // Depth from the camera picture (or an earlier DrawMeshes call) must not hide these pieces, so start clean.
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST); // pieces hide each other correctly, whatever order they come in
-    glEnable(GL_BLEND); // only draws with alpha below 1 are see-through; everything else is unchanged
+    glEnable(GL_BLEND);      // only draws with alpha below 1 are see-through; everything else is unchanged
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // The depth picture goes on texture unit 1 (unit 0 is left to the camera picture).
-    bool const hasDepth = depthTexture != 0;
+    bool const hasDepth = DepthTexture != 0;
     if (hasDepth)
     {
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, depthTexture);
+        glBindTexture(GL_TEXTURE_2D, DepthTexture);
     }
 
     // Row vectors, leftmost applies first: world -> view, then view -> clip.
@@ -124,14 +123,14 @@ void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& v
     Shader* current = nullptr; // the program in use; switched only when an item asks for a different one
     for (MeshDraw const& item : items)
     {
-        if (item.meshIndex >= meshes.size())
+        if (item.MeshIndex >= GpuMeshes.size())
         {
             continue; // stale index (meshes not set yet): skip it rather than read past the list
         }
 
         // Each item names its shader (the material's ShaderKind, from the data). Switching programs costs a little,
         // so it only happens when the shader changes from one item to the next.
-        Shader& shader = ShaderFor(item.shader);
+        Shader& shader = ShaderFor(item.Kind);
         if (!shader.IsValid())
         {
             continue; // that shader failed to build (already logged)
@@ -143,27 +142,27 @@ void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& v
             if (hasDepth)
             {
                 shader.SetInt("uDepthTex", 1);
-                shader.SetVec3("uDepthUvX", &depthUv[0]); // column 0
-                shader.SetVec3("uDepthUvY", &depthUv[3]); // column 1
-                shader.SetVec3("uDepthUvO", &depthUv[6]); // column 2: the bottom-left corner
+                shader.SetVec3("uDepthUvX", &DepthUv[0]); // column 0
+                shader.SetVec3("uDepthUvY", &DepthUv[3]); // column 1
+                shader.SetVec3("uDepthUvO", &DepthUv[6]); // column 2: the bottom-left corner
             }
         }
 
-        Matrix4x4 const mvp      = item.model * viewProjection; // local -> world -> view -> clip
-        float const     color[3] = {item.color.x, item.color.y, item.color.z};
-        float const     tint[3]  = {item.tint.x, item.tint.y, item.tint.z};
+        Matrix4x4 const mvp = item.Model * viewProjection; // local -> world -> view -> clip
+        float const color[3] = {item.Color.x, item.Color.y, item.Color.z};
+        float const tint[3] = {item.Tint.x, item.Tint.y, item.Tint.z};
 
         // m[4][4] row-major, read by GL as column-major (GL_FALSE = no transpose): that is exactly the
         // column-vector matrix the shader wants, so the first float is passed as it is.
         shader.SetMat4("uMvp", &mvp.m[0][0]);
-        shader.SetMat4("uModel", &item.model.m[0][0]);
+        shader.SetMat4("uModel", &item.Model.m[0][0]);
         shader.SetVec3("uColor", color);
         shader.SetVec3("uTint", tint);
-        shader.SetFloat("uTintAmount", item.tintAmount);
-        shader.SetFloat("uAlpha", item.alpha);
-        shader.SetFloat("uUseDepth", (hasDepth && item.occludable) ? 1.0f : 0.0f);
+        shader.SetFloat("uTintAmount", item.TintAmount);
+        shader.SetFloat("uAlpha", item.Alpha);
+        shader.SetFloat("uUseDepth", (hasDepth && item.Occludable) ? 1.0f : 0.0f);
 
-        meshes[item.meshIndex].Draw();
+        GpuMeshes[item.MeshIndex].Draw();
     }
 
     // Leave GL as we found it, so the camera drawing next frame (ARcore.cpp) does not inherit our state.

@@ -10,21 +10,21 @@
 class Mesh
 {
 public:
-    Mesh()  = default;
+    Mesh() = default;
     ~Mesh() = default; // GPU buffers are freed by Destroy(), not here (the context may already be gone)
 
-    Mesh(const Mesh&)            = delete;
+    Mesh(const Mesh&) = delete;
     Mesh& operator=(const Mesh&) = delete;
-    Mesh(Mesh&& other) noexcept;            // moving hands the GPU buffers over; 'other' is left empty
+    Mesh(Mesh&& other) noexcept; // moving hands the GPU buffers over; 'other' is left empty
     Mesh& operator=(Mesh&& other) noexcept;
 
     void Upload(MeshData const& data); // copies the CPU mesh to the GPU (replacing any earlier upload)
-    void Draw() const; // binds this mesh's VAO and draws it; the shader must already be in use
-    void Destroy(); // frees the GPU buffers (needs a live context)
+    void Draw() const;                 // binds this mesh's VAO and draws it; the shader must already be in use
+    void Destroy();                    // frees the GPU buffers (needs a live context)
 
 private:
-    GLuint  vao{0};
-    GLuint  vbo{0};
-    GLuint  ebo{0};
-    GLsizei indexCount{0}; // how many indices Draw() sends: 3 per triangle
+    GLuint Vao{0};
+    GLuint Vbo{0};
+    GLuint Ebo{0};
+    GLsizei IndexCount{0}; // how many indices Draw() sends: 3 per triangle
 };

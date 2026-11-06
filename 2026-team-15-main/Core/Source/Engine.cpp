@@ -22,6 +22,7 @@ Digipen ID:     zachary.y
 #include "equipmentDef.hpp"
 #if defined(KOPI_HAS_GL)
 #include "EquipmentScene.hpp"
+#include "Loader.hpp"
 #include "Renderer.hpp"
 #endif
 #include "Time.hpp"
@@ -513,7 +514,7 @@ void Core::Render()
     }
     if (!stationShown)
     {
-        EquipmentScene::Get().DrawLoader(loaderSeconds, viewportW, viewportH);
+        Loader::Get().Draw(loaderSeconds, viewportW, viewportH);
     }
 #endif
 }

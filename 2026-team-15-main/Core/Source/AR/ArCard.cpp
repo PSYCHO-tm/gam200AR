@@ -11,44 +11,47 @@
 #include "AR/ArModules.hpp"
 
 // Shared AR state this module uses (owned by ArContext, see AR/ArModules.hpp).
-static ArSession*&       session             = gAr.session;
-static ArAnchor*&        anchor              = gAr.anchor;
-static bool&             anchorOnCard        = gAr.anchorOnCard;
-static float (&cardMatrix)[16]               = gAr.cardMatrix;
-static float&            cardExtentX         = gAr.cardExtentX;
-static float&            cardExtentZ         = gAr.cardExtentZ;
-static bool&             cardPoseKnown       = gAr.cardPoseKnown;
-static bool&             depthEnabled        = gAr.depthEnabled;
-static float&            cardCoveredFraction = gAr.cardCoveredFraction;
-static bool&             cardCovered         = gAr.cardCovered;
-static bool&             cameraBlocked       = gAr.cameraBlocked;
+static ArSession*& session = gAr.Session;
+static ArAnchor*& anchor = gAr.Anchor;
+static bool& anchorOnCard = gAr.AnchorOnCard;
+static float (&cardMatrix)[16] = gAr.CardMatrix;
+static float& cardExtentX = gAr.CardExtentX;
+static float& cardExtentZ = gAr.CardExtentZ;
+static bool& cardPoseKnown = gAr.CardPoseKnown;
+static bool& depthEnabled = gAr.DepthEnabled;
+static float& cardCoveredFraction = gAr.CardCoveredFraction;
+static bool& cardCovered = gAr.CardCovered;
+static bool& cameraBlocked = gAr.CameraBlocked;
 
 // Private to this module
-static std::vector<uint8_t> cardPixels;                 // grayscale, from Kotlin; freed once the session is configured
+static std::vector<uint8_t> cardPixels; // grayscale, from Kotlin; freed once the session is configured
 static int cardWidthPixels = 0;
 static int cardHeightPixels = 0;
-static float cardWidthMetres = 0.0f;                    // the printed width: ARCore uses it for the card's real size
+static float cardWidthMetres = 0.0f; // the printed width: ARCore uses it for the card's real size
 static ArAugmentedImageDatabase* cardDatabase = nullptr;
-static ArTrackableList* cardList = nullptr;             // own list: sessionList is used for planes
+static ArTrackableList* cardList = nullptr; // own list: sessionList is used for planes
 static ArPose* cardPose = nullptr;
-static ArPose* cardCameraPose = nullptr;                // where the phone is, to know how far away the card is
-static ArPose* cardAnchorPose = nullptr;                // where the current anchor is, to compare with the card
-static int cardSteadyFrames = 0;                        // tracked frames in a row the card has been fully in view
-static const float cardMaxDistance = 0.6f;              // metres: further away, ARCore's guess of the card's depth is too rough to use
-static const float cardRefineDistance = 0.01f;          // metres: move the anchor when the card's latest pose is this far from it
-static const float cardRefineAngle = 0.035f;            // radians (about 2 degrees): or when it is turned this much
-static bool cardFollowsTilt = false;                    // true = the station tilts with the card (wall poster), false = always upright (counter); from AR.json
-static bool cardInView = false;                         // on-screen debug: the card is fully seen this frame
-static float cardDistanceNow = 0.0f;                    // on-screen debug: metres from the phone to the card, last seen
-static int cardRefineCount = 0;                         // on-screen debug: how often the anchor followed the card
-static float cardViewAngle = 0.0f;                      // on-screen debug: degrees off straight-on the phone sees the card, last seen
-static const float cardClearFraction = 0.15f;           // the card counts as uncovered (safe to follow) below this
-static const int cardHistorySize = 8;                   // about 0.25 s of card readings, averaged before the anchor moves
-static float cardHistory[cardHistorySize][4]{};         // x, y, z, yaw of each reading
+static ArPose* cardCameraPose = nullptr; // where the phone is, to know how far away the card is
+static ArPose* cardAnchorPose = nullptr; // where the current anchor is, to compare with the card
+static int cardSteadyFrames = 0;         // tracked frames in a row the card has been fully in view
+static const float cardMaxDistance =
+    0.6f; // metres: further away, ARCore's guess of the card's depth is too rough to use
+static const float cardRefineDistance =
+    0.01f;                                   // metres: move the anchor when the card's latest pose is this far from it
+static const float cardRefineAngle = 0.035f; // radians (about 2 degrees): or when it is turned this much
+static bool cardFollowsTilt =
+    false; // true = the station tilts with the card (wall poster), false = always upright (counter); from AR.json
+static bool cardInView = false;      // on-screen debug: the card is fully seen this frame
+static float cardDistanceNow = 0.0f; // on-screen debug: metres from the phone to the card, last seen
+static int cardRefineCount = 0;      // on-screen debug: how often the anchor followed the card
+static float cardViewAngle = 0.0f;   // on-screen debug: degrees off straight-on the phone sees the card, last seen
+static const float cardClearFraction = 0.15f;   // the card counts as uncovered (safe to follow) below this
+static const int cardHistorySize = 8;           // about 0.25 s of card readings, averaged before the anchor moves
+static float cardHistory[cardHistorySize][4]{}; // x, y, z, yaw of each reading
 static int cardHistoryNext = 0;
 static int cardHistoryCount = 0;
-static const float cardSteadySpread = 0.015f;           // metres: every reading within this of the average, or do not move
-static const float cardSteadyAngle = 0.052f;            // radians (about 3 degrees): same for the turn
+static const float cardSteadySpread = 0.015f; // metres: every reading within this of the average, or do not move
+static const float cardSteadyAngle = 0.052f;  // radians (about 3 degrees): same for the turn
 
 
 /**
@@ -79,13 +82,14 @@ void ArSetMarkerConfig(float widthMetres, bool followTilt)
 
 void ArCardConfigure(ArConfig* config)
 {
-    if(!cardPixels.empty() && cardDatabase == nullptr)
+    if (!cardPixels.empty() && cardDatabase == nullptr)
     {
         ArAugmentedImageDatabase_create(session, &cardDatabase);
         int32_t cardIndex = 0;
-        const ArStatus cardStatus = ArAugmentedImageDatabase_addImageWithPhysicalSize(session, cardDatabase, "station",
-            cardPixels.data(), cardWidthPixels, cardHeightPixels, cardWidthPixels, cardWidthMetres, &cardIndex);
-        if(cardStatus == AR_SUCCESS)
+        const ArStatus cardStatus = ArAugmentedImageDatabase_addImageWithPhysicalSize(
+            session, cardDatabase, "station", cardPixels.data(), cardWidthPixels, cardHeightPixels, cardWidthPixels,
+            cardWidthMetres, &cardIndex);
+        if (cardStatus == AR_SUCCESS)
         {
             ArConfig_setAugmentedImageDatabase(session, config, cardDatabase);
             LOGI("Marker card added (%dx%d px, %.3f m wide)", cardWidthPixels, cardHeightPixels, cardWidthMetres);
@@ -108,10 +112,7 @@ void ArCardResume()
     cardHistoryCount = 0;
 }
 
-bool ArCardLoaded()
-{
-    return cardDatabase != nullptr;
-}
+bool ArCardLoaded() { return cardDatabase != nullptr; }
 
 
 /**
@@ -122,11 +123,11 @@ bool ArCardLoaded()
  */
 void ArCardUpdate(ArCamera* camera)
 {
-    if(cardDatabase == nullptr)
+    if (cardDatabase == nullptr)
     {
         return;
     }
-    if(cardList == nullptr)
+    if (cardList == nullptr)
     {
         ArTrackableList_create(session, &cardList);
         ArPose_create(session, nullptr, &cardPose);
@@ -139,7 +140,7 @@ void ArCardUpdate(ArCamera* camera)
     ArTrackableList_getSize(session, cardList, &count);
 
     bool fullyInView = false;
-    for(int32_t i = 0; i < count; ++i)
+    for (int32_t i = 0; i < count; ++i)
     {
         ArTrackable* trackable = nullptr;
         ArTrackableList_acquireItem(session, cardList, i, &trackable);
@@ -150,7 +151,7 @@ void ArCardUpdate(ArCamera* camera)
         ArAugmentedImage_getTrackingMethod(session, ArAsAugmentedImage(trackable), &method);
 
         // Seen now or last known: where the card is, so the depth check can tell when a hand covers it.
-        if(state == AR_TRACKING_STATE_TRACKING)
+        if (state == AR_TRACKING_STATE_TRACKING)
         {
             ArAugmentedImage_getCenterPose(session, ArAsAugmentedImage(trackable), cardPose);
             ArPose_getMatrix(session, cardPose, cardMatrix);
@@ -160,7 +161,7 @@ void ArCardUpdate(ArCamera* camera)
         }
 
         // FULL_TRACKING = the camera sees the card right now (LAST_KNOWN_POSE would be a guess)
-        if(state == AR_TRACKING_STATE_TRACKING && method == AR_AUGMENTED_IMAGE_TRACKING_METHOD_FULL_TRACKING)
+        if (state == AR_TRACKING_STATE_TRACKING && method == AR_AUGMENTED_IMAGE_TRACKING_METHOD_FULL_TRACKING)
         {
             fullyInView = true;
             ++cardSteadyFrames;
@@ -169,8 +170,9 @@ void ArCardUpdate(ArCamera* camera)
             // so the anchor follows the card's latest pose while it is in view and close enough.
             float cardRaw[7];
             float cameraRaw[7];
-            ArAugmentedImage_getCenterPose(session, ArAsAugmentedImage(trackable), cardPose);   // +y points out of the card
-            ArPose_getPoseRaw(session, cardPose, cardRaw);       // qx qy qz qw tx ty tz
+            ArAugmentedImage_getCenterPose(session, ArAsAugmentedImage(trackable),
+                                           cardPose);      // +y points out of the card
+            ArPose_getPoseRaw(session, cardPose, cardRaw); // qx qy qz qw tx ty tz
             ArCamera_getPose(session, camera, cardCameraPose);
             ArPose_getPoseRaw(session, cardCameraPose, cameraRaw);
             const float cx = cardRaw[4] - cameraRaw[4];
@@ -186,24 +188,25 @@ void ArCardUpdate(ArCamera* camera)
                 const float faceX = 2.0f * (px * py - pw * pz);
                 const float faceY = 1.0f - 2.0f * (px * px + pz * pz);
                 const float faceZ = 2.0f * (py * pz + pw * px);
-                const float toPhone = -(faceX * cx + faceY * cy + faceZ * cz) / (cardDistance > 0.001f ? cardDistance : 0.001f);
+                const float toPhone =
+                    -(faceX * cx + faceY * cy + faceZ * cz) / (cardDistance > 0.001f ? cardDistance : 0.001f);
                 cardViewAngle = std::acos(toPhone < -1.0f ? -1.0f : (toPhone > 1.0f ? 1.0f : toPhone)) * 57.2958f;
             }
 
             // The station stands upright whatever the card's tilt: keep the card's centre and its turn around the
             // vertical, but use the real world's up (+y), so a card on a tilted or upright screen still works.
             const float qx = cardRaw[0], qy = cardRaw[1], qz = cardRaw[2], qw = cardRaw[3];
-            const float cardXx = 1.0f - 2.0f * (qy * qy + qz * qz);   // the card's +x axis in the world, x and z parts
+            const float cardXx = 1.0f - 2.0f * (qy * qy + qz * qz); // the card's +x axis in the world, x and z parts
             const float cardXz = 2.0f * (qx * qz - qw * qy);
-            const float cardZx = 2.0f * (qx * qz + qw * qy);          // the card's +z axis, for a card turned so x is vertical
+            const float cardZx = 2.0f * (qx * qz + qw * qy); // the card's +z axis, for a card turned so x is vertical
             const float cardZz = 1.0f - 2.0f * (qx * qx + qy * qy);
-            const float yaw = (cardXx * cardXx + cardXz * cardXz > 0.01f) ? std::atan2(-cardXz, cardXx)
-                                                                           : std::atan2(cardZx, cardZz);
-            float uprightRaw[7] = {0.0f, std::sin(yaw * 0.5f), 0.0f, std::cos(yaw * 0.5f),
-                                   cardRaw[4], cardRaw[5], cardRaw[6]};
-            if(cardFollowsTilt)
+            const float yaw =
+                (cardXx * cardXx + cardXz * cardXz > 0.01f) ? std::atan2(-cardXz, cardXx) : std::atan2(cardZx, cardZz);
+            float uprightRaw[7] = {0.0f,       std::sin(yaw * 0.5f), 0.0f,      std::cos(yaw * 0.5f),
+                                   cardRaw[4], cardRaw[5],           cardRaw[6]};
+            if (cardFollowsTilt)
             {
-                std::memcpy(uprightRaw, cardRaw, sizeof(uprightRaw));   // the card's full pose: +y out of the card
+                std::memcpy(uprightRaw, cardRaw, sizeof(uprightRaw)); // the card's full pose: +y out of the card
             }
 
             // Smoothing and a sanity check: keep the last cardHistorySize readings and use their average, but only
@@ -214,17 +217,17 @@ void ArCardUpdate(ArCamera* camera)
             cardHistory[cardHistoryNext][2] = uprightRaw[6];
             cardHistory[cardHistoryNext][3] = yaw;
             cardHistoryNext = (cardHistoryNext + 1) % cardHistorySize;
-            if(cardHistoryCount < cardHistorySize)
+            if (cardHistoryCount < cardHistorySize)
             {
                 ++cardHistoryCount;
             }
             bool cardSteady = false;
-            if(cardHistoryCount == cardHistorySize)
+            if (cardHistoryCount == cardHistorySize)
             {
                 float avg[3] = {0.0f, 0.0f, 0.0f};
                 float yawSin = 0.0f;
                 float yawCos = 0.0f;
-                for(int h = 0; h < cardHistorySize; ++h)
+                for (int h = 0; h < cardHistorySize; ++h)
                 {
                     avg[0] += cardHistory[h][0] / cardHistorySize;
                     avg[1] += cardHistory[h][1] / cardHistorySize;
@@ -233,9 +236,9 @@ void ArCardUpdate(ArCamera* camera)
                     yawCos += std::cos(cardHistory[h][3]);
                 }
                 const float avgYaw = std::atan2(yawSin, yawCos);
-                float spread = 0.0f;       // the reading furthest from the average, in metres
-                float yawSpread = 0.0f;    // and in radians
-                for(int h = 0; h < cardHistorySize; ++h)
+                float spread = 0.0f;    // the reading furthest from the average, in metres
+                float yawSpread = 0.0f; // and in radians
+                for (int h = 0; h < cardHistorySize; ++h)
                 {
                     const float dx = cardHistory[h][0] - avg[0];
                     const float dy = cardHistory[h][1] - avg[1];
@@ -246,12 +249,12 @@ void ArCardUpdate(ArCamera* camera)
                     yawSpread = a > yawSpread ? a : yawSpread;
                 }
                 cardSteady = spread <= cardSteadySpread && yawSpread <= cardSteadyAngle;
-                if(cardSteady)   // move to the average, not the latest (noisy) reading
+                if (cardSteady) // move to the average, not the latest (noisy) reading
                 {
                     uprightRaw[4] = avg[0];
                     uprightRaw[5] = avg[1];
                     uprightRaw[6] = avg[2];
-                    if(!cardFollowsTilt)
+                    if (!cardFollowsTilt)
                     {
                         uprightRaw[1] = std::sin(avgYaw * 0.5f);
                         uprightRaw[3] = std::cos(avgYaw * 0.5f);
@@ -259,9 +262,11 @@ void ArCardUpdate(ArCamera* camera)
                 }
             }
             // With depth, only trust the card when it is clearly uncovered ("cannot tell" is not trusted either:
-            // a hand right at the lens reads as unknown depth). Without depth on this phone, the steadiness check alone.
-            const bool cardClear = !depthEnabled || (cardCoveredFraction >= 0.0f && cardCoveredFraction < cardClearFraction);
-            if(anchorOnCard && (!cardClear || cardCovered || cameraBlocked))
+            // a hand right at the lens reads as unknown depth). Without depth on this phone, the steadiness check
+            // alone.
+            const bool cardClear =
+                !depthEnabled || (cardCoveredFraction >= 0.0f && cardCoveredFraction < cardClearFraction);
+            if (anchorOnCard && (!cardClear || cardCovered || cameraBlocked))
             {
                 // Readings taken with a hand over the card can agree with each other and still be wrong (10 cm seen
                 // right after uncovering): forget them, so the average restarts from clean readings only.
@@ -270,12 +275,12 @@ void ArCardUpdate(ArCamera* camera)
             }
 
             bool moveAnchor = false;
-            if(!anchorOnCard)
+            if (!anchorOnCard)
             {
                 moveAnchor = cardSteadyFrames >= framesToHold && cardDistance <= cardMaxDistance && cardSteady;
             }
-            else if(cardDistance <= cardMaxDistance && anchor != nullptr && cardSteady && cardClear && !cardCovered &&
-                    !cameraBlocked)
+            else if (cardDistance <= cardMaxDistance && anchor != nullptr && cardSteady && cardClear && !cardCovered &&
+                     !cameraBlocked)
             {
                 float anchorRaw[7];
                 ArAnchor_getPose(session, anchor, cardAnchorPose);
@@ -287,34 +292,34 @@ void ArCardUpdate(ArCamera* camera)
                 const float dot = std::fabs(uprightRaw[0] * anchorRaw[0] + uprightRaw[1] * anchorRaw[1] +
                                             uprightRaw[2] * anchorRaw[2] + uprightRaw[3] * anchorRaw[3]);
                 const float turn = 2.0f * std::acos(dot < 1.0f ? dot : 1.0f);
-                if(shift > cardRefineDistance || turn > cardRefineAngle)
+                if (shift > cardRefineDistance || turn > cardRefineAngle)
                 {
                     moveAnchor = true;
                     ++cardRefineCount;
-                    LOGI("Marker card: refined %.1f cm, %.1f deg, %.2f m away (dx %.3f dy %.3f dz %.3f)", shift * 100.0f,
-                         turn * 57.2958f, cardDistance, ax, ay, az);
+                    LOGI("Marker card: refined %.1f cm, %.1f deg, %.2f m away (dx %.3f dy %.3f dz %.3f)",
+                         shift * 100.0f, turn * 57.2958f, cardDistance, ax, ay, az);
                 }
             }
 
-            if(moveAnchor)
+            if (moveAnchor)
             {
                 ArAnchor* cardAnchor = nullptr;
                 ArPose* uprightPose = nullptr;
                 ArPose_create(session, uprightRaw, &uprightPose);
-                // A world anchor, not one tied to the card: a card-tied anchor copies every small wobble in ARCore's guess
-                // of the card's tilt, so the "upright" station tipped a few degrees and was re-placed almost every frame.
-                // The refinement above still moves it whenever the card really moves (1 cm / 2 degrees).
+                // A world anchor, not one tied to the card: a card-tied anchor copies every small wobble in ARCore's
+                // guess of the card's tilt, so the "upright" station tipped a few degrees and was re-placed almost
+                // every frame. The refinement above still moves it whenever the card really moves (1 cm / 2 degrees).
                 const ArStatus anchorStatus = ArSession_acquireNewAnchor(session, uprightPose, &cardAnchor);
                 ArPose_destroy(uprightPose);
-                if(anchorStatus == AR_SUCCESS)
+                if (anchorStatus == AR_SUCCESS)
                 {
                     const bool firstOnCard = !anchorOnCard;
-                    if(anchor != nullptr)   // a table anchor, an old card anchor after Resume, or a refinement
+                    if (anchor != nullptr) // a table anchor, an old card anchor after Resume, or a refinement
                     {
                         ArAnchor_detach(session, anchor);
                         ArAnchor_release(anchor);
                     }
-                    if(firstOnCard)
+                    if (firstOnCard)
                     {
                         LOGI("Marker card found: station %s the card, %.2f m away",
                              anchor != nullptr ? "moved onto" : "placed on", cardDistance);
@@ -328,27 +333,28 @@ void ArCardUpdate(ArCamera* camera)
     }
 
     cardInView = fullyInView;
-    if(!fullyInView)
+    if (!fullyInView)
     {
         cardSteadyFrames = 0;
-        cardHistoryCount = 0;   // start the average again from fresh readings
+        cardHistoryCount = 0; // start the average again from fresh readings
     }
 }
 
 const char* ArCardStatusPlaced(char* text, std::size_t size)
 {
     const int coverPercent = cardCoveredFraction < 0.0f ? -1 : static_cast<int>(cardCoveredFraction * 100.0f + 0.5f);
-    if(cardCovered)
+    if (cardCovered)
     {
-        std::snprintf(text, size, "AR: ON CARD - card %d%% covered, station hidden", coverPercent < 0 ? 0 : coverPercent);
+        std::snprintf(text, size, "AR: ON CARD - card %d%% covered, station hidden",
+                      coverPercent < 0 ? 0 : coverPercent);
     }
     // Live card state: following it, card too far to trust, or out of view (station held where it was).
-    else if(!cardInView)
+    else if (!cardInView)
     {
-        std::snprintf(text, size, "AR: ON CARD - card out of view (last %.0f deg), held (follows %d)",
-                      cardViewAngle, cardRefineCount);
+        std::snprintf(text, size, "AR: ON CARD - card out of view (last %.0f deg), held (follows %d)", cardViewAngle,
+                      cardRefineCount);
     }
-    else if(cardDistanceNow > cardMaxDistance)
+    else if (cardDistanceNow > cardMaxDistance)
     {
         std::snprintf(text, size, "AR: ON CARD - %.2f m, %.0f deg, too far, held (follows %d)", cardDistanceNow,
                       cardViewAngle, cardRefineCount);
@@ -363,7 +369,7 @@ const char* ArCardStatusPlaced(char* text, std::size_t size)
 
 const char* ArCardStatusScanning(char* text, std::size_t size)
 {
-    if(cardInView)   // the card is found but not placed yet: say what it is waiting for
+    if (cardInView) // the card is found but not placed yet: say what it is waiting for
     {
         std::snprintf(text, size, "AR: card seen - %.2f m, %.0f deg, %s", cardDistanceNow, cardViewAngle,
                       cardDistanceNow > cardMaxDistance ? "come closer" : "hold steady");
@@ -380,13 +386,13 @@ void ArCardShutdown()
     cardPoseKnown = false;
     cardHistoryCount = 0;
 
-    if(cardList != nullptr)
+    if (cardList != nullptr)
     {
         ArTrackableList_destroy(cardList);
     }
     cardList = nullptr;
 
-    if(cardPose != nullptr)
+    if (cardPose != nullptr)
     {
         ArPose_destroy(cardPose);
         ArPose_destroy(cardCameraPose);
@@ -396,7 +402,7 @@ void ArCardShutdown()
     cardCameraPose = nullptr;
     cardAnchorPose = nullptr;
 
-    if(cardDatabase != nullptr)
+    if (cardDatabase != nullptr)
     {
         ArAugmentedImageDatabase_destroy(cardDatabase);
     }

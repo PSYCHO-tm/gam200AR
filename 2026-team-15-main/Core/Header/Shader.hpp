@@ -11,16 +11,16 @@
 class Shader
 {
 public:
-    Shader()  = default;
+    Shader() = default;
     ~Shader() = default; // the GPU program is freed by Destroy(), not here (the context may already be gone)
 
-    Shader(const Shader&)            = delete;
+    Shader(const Shader&) = delete;
     Shader& operator=(const Shader&) = delete;
-    Shader(Shader&& other) noexcept;            // moving hands the program over; 'other' is left empty
+    Shader(Shader&& other) noexcept; // moving hands the program over; 'other' is left empty
     Shader& operator=(Shader&& other) noexcept;
 
     bool Load(const char* vertexSource, const char* fragmentSource); // compile + link; false (and logged) on any error
-    void Destroy();     // deletes the program (needs a live context)
+    void Destroy();                                                  // deletes the program (needs a live context)
     void ContextLost(); // forget the handle without deleting: the driver already freed it
 
     void Use() const;     // makes this the current program: call before the Set* functions
@@ -33,9 +33,9 @@ public:
     void SetMat4(const char* name, const float* value); // 16 floats, column-major (Matrix4x4's memory, as it is)
 
 private:
-    GLint         Location(const char* name);                // cached glGetUniformLocation
+    GLint Location(const char* name);                       // cached glGetUniformLocation
     static GLuint Compile(GLenum type, const char* source); // one stage; 0 on error (log printed)
 
-    GLuint                                 program{0};       // 0 = not loaded
-    std::unordered_map<std::string, GLint> locations{};      // uniform name -> location (-1 kept too, so it logs once)
+    GLuint Program{0};                                  // 0 = not loaded
+    std::unordered_map<std::string, GLint> Locations{}; // uniform name -> location (-1 kept too, so it logs once)
 };

@@ -10,9 +10,9 @@
 #include "AR/ArModules.hpp"
 
 // Shared AR state this module uses (owned by ArContext, see AR/ArModules.hpp).
-static GLuint&           cameraTexture       = gAr.cameraTexture;
-static ArSession*&       session             = gAr.session;
-static ArFrame*&         sessionFrame        = gAr.sessionFrame;
+static GLuint& cameraTexture = gAr.CameraTexture;
+static ArSession*& session = gAr.Session;
+static ArFrame*& sessionFrame = gAr.SessionFrame;
 
 // Private to this module
 static GLuint cameraProgram = 0;
@@ -55,13 +55,13 @@ void main()
  */
 static GLuint CompileShader(GLenum type, const char* source)
 {
-    GLuint shader = glCreateShader(type);          // reserve a shader number
-    glShaderSource(shader, 1, &source, nullptr);   // hand over the text
-    glCompileShader(shader);                       // the driver compiles it now
- 
+    GLuint shader = glCreateShader(type);        // reserve a shader number
+    glShaderSource(shader, 1, &source, nullptr); // hand over the text
+    glCompileShader(shader);                     // the driver compiles it now
+
     GLint ok = GL_FALSE;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-    if(ok == GL_FALSE)
+    if (ok == GL_FALSE)
     {
         char log[512];
         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
@@ -84,29 +84,29 @@ static GLuint BuildProgram(const char* vertexSource, const char* fragmentSource)
 {
     GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
     GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource);
-    if(vertexShader == 0 || fragmentShader == 0)
+    if (vertexShader == 0 || fragmentShader == 0)
     {
-        if(vertexShader != 0)
+        if (vertexShader != 0)
         {
             glDeleteShader(vertexShader);
         }
-        if(fragmentShader != 0)
+        if (fragmentShader != 0)
         {
             glDeleteShader(fragmentShader);
         }
         return 0;
     }
- 
+
     GLuint program = glCreateProgram();
     glAttachShader(program, vertexShader);
     glAttachShader(program, fragmentShader);
     glLinkProgram(program);
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
- 
+
     GLint ok = GL_FALSE;
     glGetProgramiv(program, GL_LINK_STATUS, &ok);
-    if(ok == GL_FALSE)
+    if (ok == GL_FALSE)
     {
         char log[512];
         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
@@ -125,7 +125,7 @@ static GLuint BuildProgram(const char* vertexSource, const char* fragmentSource)
 void ArCamPictureInit()
 {
     cameraProgram = BuildProgram(cameraVertexShader, cameraFragmentShader);
-    if(cameraProgram != 0)
+    if (cameraProgram != 0)
     {
         cameraSamplerLoc = glGetUniformLocation(cameraProgram, "uCamera");
     }
@@ -141,15 +141,16 @@ void ArCamPictureInit()
  */
 void ArCamPictureDraw()
 {
-    if(cameraProgram == 0)
+    if (cameraProgram == 0)
     {
         return;
     }
 
-    static const float corners[8] = { -1.0f, -1.0f,    1.0f, -1.0f,    -1.0f, 1.0f,    1.0f, 1.0f };
+    static const float corners[8] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
 
     float uv[8];
-    ArFrame_transformCoordinates2d(session, sessionFrame, AR_COORDINATES_2D_OPENGL_NORMALIZED_DEVICE_COORDINATES, 4, corners, AR_COORDINATES_2D_TEXTURE_NORMALIZED, uv);
+    ArFrame_transformCoordinates2d(session, sessionFrame, AR_COORDINATES_2D_OPENGL_NORMALIZED_DEVICE_COORDINATES, 4,
+                                   corners, AR_COORDINATES_2D_TEXTURE_NORMALIZED, uv);
 
 
     glBindVertexArray(0);
@@ -166,7 +167,7 @@ void ArCamPictureDraw()
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, uv);
 
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); 
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);

@@ -11,7 +11,7 @@
  * @return  true if ARCore is ready and a session can be created, otherwise
  *          false (call again later).
  */
-bool ArInitialise(void *env, void *activity);
+bool ArInitialise(void* env, void* activity);
 
 /**
  * @brief   Gives ARCore the printed card that places the station.
@@ -43,7 +43,7 @@ void ArSetMarkerConfig(float widthMetres, bool followTilt);
  * @return  true if the session, settings and frame all exist afterwards,
  *          otherwise false.
  */
-bool ArSessionCreate(void *env, void *activity);
+bool ArSessionCreate(void* env, void* activity);
 
 /**
  * @brief   Starts or resumes the ARCore session.

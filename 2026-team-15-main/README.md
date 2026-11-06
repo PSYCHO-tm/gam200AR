@@ -120,6 +120,9 @@ find Core Tests \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) | xargs clan
 
 Naming problems reported by `clang-tidy` have to be fixed by hand. The rules are in `.clang-tidy`.
 
+The graphics and AR files (`Core/Source/AR/`, `Renderer`, `Shader`, `Mesh`, `Geometry`, `objLoader`, `EquipmentScene`,
+`Loader`) pass both checks: struct and class members are `CamelCase`, enums `UPPER_CASE`, everything else `camelBack`.
+
 ---
 
 ## Tests and CI
@@ -156,8 +159,9 @@ JNI update()
 │        └─ ArPlanesPlace()   (placeOnTables only)  AR/ArPlanes      place on a table instead
 └─ Core::Render()                                   Engine.cpp
     ├─ ArCameraDraw() -> ArCamPictureDraw()         AR/ArCamera      1. the camera picture (back layer)
-    └─ EquipmentScene::Draw()                       EquipmentScene   2. the station: what to draw and where
-         └─ Renderer::DrawMeshes()                  Renderer            how: shader, colours, depth hiding
+    ├─ EquipmentScene::Draw()                       EquipmentScene   2. the station: what to draw and where
+    │    └─ Renderer::DrawMeshes()                  Renderer            how: shader, colours, depth hiding
+    └─ Loader::Draw()   (station not shown only)    Loader           3. the spinning dots, on top
 ```
 
 ### AR modules
@@ -183,13 +187,19 @@ Android only: they live in `Core/Source/AR/`, and the desktop build leaves that 
 
 | File | Job |
 |---|---|
-| `Renderer.*` | How things are drawn: picks each item's shader, sets colours and matrices, depth test, blending |
+| `Renderer.*` | How things are drawn: picks each item's shader, sets colours and matrices, depth test, blending. Also the shared mesh registry (`AddMesh`) |
 | `Shader.*` | One shader program |
 | `Mesh.*` | One mesh on the GPU |
 | `Geometry.*` | Mesh data on the CPU (`Vertex`, `MeshData`) |
 | `objLoader.*` | Reads `.obj` meshes, and builds each piece's material `{Shader, Colour}` (`MakeMaterial`) |
-| `EquipmentScene.*` | The station: pieces from the ECS, tap picking (ray against triangles), the draw list, the loader |
+| `EquipmentScene.*` | Drawing module: the station (pieces from the ECS, tap picking, debug square) |
+| `Loader.*` | Drawing module: the "looking for the card" spinner |
 | `Assets/Shader/lit.vert`, `lit.frag` | The lit shader. `Core/Header/lit_*.hpp` are generated from them: never edit those |
+
+**Drawing modules.** The Renderer keeps one list of meshes for everyone. A drawing module (EquipmentScene, Loader,
+later the FreeType labels) adds its own meshes once with `Renderer::Get().AddMesh(mesh)`, keeps the ids it gets back,
+and each frame hands the Renderer a list of `MeshDraw` items using those ids. Modules never touch each other's meshes,
+so adding or removing one is one call in `Core::Render()` (`Engine.cpp`).
 
 ### Change it from data (no C++)
 
@@ -213,10 +223,15 @@ Data and models are baked into the app, so rebuild and reinstall after changing 
   3. Point an `Equipment.json` entry's `MeshRef` at it.
 - **Add a shader**
   1. Add `Assets/Shader/<name>.vert` and `.frag`, and an `embed_shader(...)` line in the same CMakeLists.
-  2. Add a `ShaderKind` and its name in `objLoader.hpp` / `objLoader.cpp` (`ShaderKindFromName`).
+  2. Add a `SHADER_KIND` value and its name in `objLoader.hpp` / `objLoader.cpp` (`ShaderKindFromName`).
   3. Add a case for it in `Renderer::ShaderFor`.
 - **Add a component:** follow the 3 steps at the top of `Core/Header/RegisterComponents.hpp` (struct, JSON macro,
   `COMPONENT_LIST`), plus an optional `Rules<T>::Check`.
+- **Add a drawing module**
+  1. Write `Core/Header/X.hpp` / `Core/Source/X.cpp` with a `Draw(...)`; on first use, `AddMesh` your meshes and keep
+     the ids.
+  2. Call `X::Get().Draw(...)` from `Core::Render()` in `Engine.cpp`.
+  3. It uses OpenGL, so add `X` to the desktop exclude list in `Core/CMakeLists.txt` (next to `Renderer`).
 - **Add an AR module**
   1. Write `Core/Source/AR/ArX.cpp` and declare its functions in `ArModules.hpp`.
   2. Put any value other modules need in `ArContext`.

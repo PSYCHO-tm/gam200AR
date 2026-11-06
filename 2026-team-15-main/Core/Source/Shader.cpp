@@ -32,10 +32,10 @@ namespace
 }
 
 Shader::Shader(Shader&& other) noexcept
-    : program{other.program},
-      locations{std::move(other.locations)}
+    : Program{other.Program},
+      Locations{std::move(other.Locations)}
 {
-    other.program = 0;
+    other.Program = 0;
 }
 
 Shader& Shader::operator=(Shader&& other) noexcept
@@ -43,9 +43,9 @@ Shader& Shader::operator=(Shader&& other) noexcept
     if (this != &other)
     {
         Destroy();
-        program       = other.program;
-        locations     = std::move(other.locations);
-        other.program = 0;
+        Program = other.Program;
+        Locations = std::move(other.Locations);
+        other.Program = 0;
     }
     return *this;
 }
@@ -95,19 +95,19 @@ bool Shader::Load(const char* vertexSource, const char* fragmentSource)
         return false;
     }
 
-    program = glCreateProgram();
-    glAttachShader(program, vs);
-    glAttachShader(program, fs);
-    glLinkProgram(program);
+    Program = glCreateProgram();
+    glAttachShader(Program, vs);
+    glAttachShader(Program, fs);
+    glLinkProgram(Program);
     glDeleteShader(vs);
     glDeleteShader(fs);
 
     GLint ok = GL_FALSE;
-    glGetProgramiv(program, GL_LINK_STATUS, &ok);
+    glGetProgramiv(Program, GL_LINK_STATUS, &ok);
     if (ok == GL_FALSE)
     {
         char log[512];
-        glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+        glGetProgramInfoLog(Program, sizeof(log), nullptr, log);
         LOGE("Program link error: (%s)", log);
         Destroy();
         return false;
@@ -118,40 +118,40 @@ bool Shader::Load(const char* vertexSource, const char* fragmentSource)
 // Frees the GPU program and forgets the cached uniform locations (they belong to that program only).
 void Shader::Destroy()
 {
-    if (program != 0)
+    if (Program != 0)
     {
-        glDeleteProgram(program);
+        glDeleteProgram(Program);
     }
-    program = 0;
-    locations.clear();
+    Program = 0;
+    Locations.clear();
 }
 
 // The context died with the program in it: just forget the handle, never call glDeleteProgram on it.
 void Shader::ContextLost()
 {
-    program = 0;
-    locations.clear();
+    Program = 0;
+    Locations.clear();
 }
 
-void Shader::Use() const { glUseProgram(program); }
+void Shader::Use() const { glUseProgram(Program); }
 
-bool Shader::IsValid() const { return program != 0; }
+bool Shader::IsValid() const { return Program != 0; }
 
 // Asking GL for a uniform's location by name is slow, so each name is looked up once and remembered.
 GLint Shader::Location(const char* name)
 {
-    const auto it = locations.find(name);
-    if (it != locations.end())
+    const auto it = Locations.find(name);
+    if (it != Locations.end())
     {
         return it->second;
     }
 
-    const GLint loc = glGetUniformLocation(program, name);
+    const GLint loc = glGetUniformLocation(Program, name);
     if (loc == -1)
     {
         LOGE("Uniform '%s' not found (misspelled, or unused so the compiler removed it)", name);
     }
-    locations.emplace(name, loc);
+    Locations.emplace(name, loc);
     return loc;
 }
 

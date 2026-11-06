@@ -10,54 +10,53 @@
 #include "AR/ArModules.hpp"
 
 // Shared AR state this module uses (owned by ArContext, see AR/ArModules.hpp).
-static ArSession*&       session             = gAr.session;
-static ArFrame*&         sessionFrame        = gAr.sessionFrame;
-static ArTrackableList*& sessionList         = gAr.sessionList;
-static ArAnchor*&        anchor              = gAr.anchor;
-static int&              displayWidth        = gAr.displayWidth;
-static int&              displayHeight       = gAr.displayHeight;
-static float (&lastAnchorMatrix)[16]         = gAr.lastAnchorMatrix;
-static bool&             anchorPoseValid     = gAr.anchorPoseValid;
+static ArSession*& session = gAr.Session;
+static ArFrame*& sessionFrame = gAr.SessionFrame;
+static ArTrackableList*& sessionList = gAr.SessionList;
+static ArAnchor*& anchor = gAr.Anchor;
+static int& displayWidth = gAr.DisplayWidth;
+static int& displayHeight = gAr.DisplayHeight;
+static float (&lastAnchorMatrix)[16] = gAr.LastAnchorMatrix;
+static bool& anchorPoseValid = gAr.AnchorPoseValid;
 
 // Private to this module
-static ArHitResultList* hitList = nullptr;   // what the middle-of-the-screen ray touched, nearest first
-static ArHitResult* hitResult = nullptr;     // one entry of that list
-static ArPose* hitPose = nullptr;            // where on the surface it touched
-static ArPose* cameraPose = nullptr;         // where the phone is (only used to say how far below it a plane is)
+static ArHitResultList* hitList = nullptr; // what the middle-of-the-screen ray touched, nearest first
+static ArHitResult* hitResult = nullptr;   // one entry of that list
+static ArPose* hitPose = nullptr;          // where on the surface it touched
+static ArPose* cameraPose = nullptr;       // where the phone is (only used to say how far below it a plane is)
 static int validHitFrames = 0;
-static float markerMatrix[16]{};             // where the middle-of-the-screen ray touched a plane (OpenGL layout)
-static int markerState = 0;                  // 0 = no plane under the ray, 1 = plane but not usable, 2 = usable, holding steady
-static float hitDistance = 0.0f;             // metres from the phone to that plane
-static float hitBelow = 0.0f;                // metres the plane is below the phone
+static float markerMatrix[16]{}; // where the middle-of-the-screen ray touched a plane (OpenGL layout)
+static int markerState = 0;      // 0 = no plane under the ray, 1 = plane but not usable, 2 = usable, holding steady
+static float hitDistance = 0.0f; // metres from the phone to that plane
+static float hitBelow = 0.0f;    // metres the plane is below the phone
 static const int maxDrawPlanes = 8;
-static float drawPlaneMatrix[maxDrawPlanes][16]{};   // centre pose of each plane worth drawing (OpenGL layout)
-static float drawPlaneExtent[maxDrawPlanes][2]{};    // its size along its own x and z, in metres
-static int drawPlaneCount = 0;                       // how many planes are worth drawing right now
-static ArPose* planeCentrePose = nullptr;            // reusable pose object for reading each plane's centre
-static int planeCount = 0;                   // how many planes ARCore has right now, for the on-screen status
-static const char* placementResult = nullptr; // what the middle-of-the-screen ray touched this frame, for the on-screen status               // how many tracked frames in a row the middle of the screen has pointed at a good plane
-static const float maxPlaceDistance = 3.0f;  // metres: ignore planes further away than this
+static float drawPlaneMatrix[maxDrawPlanes][16]{}; // centre pose of each plane worth drawing (OpenGL layout)
+static float drawPlaneExtent[maxDrawPlanes][2]{};  // its size along its own x and z, in metres
+static int drawPlaneCount = 0;                     // how many planes are worth drawing right now
+static ArPose* planeCentrePose = nullptr;          // reusable pose object for reading each plane's centre
+static int planeCount = 0;                         // how many planes ARCore has right now, for the on-screen status
+static const char* placementResult =
+    nullptr; // what the middle-of-the-screen ray touched this frame, for the on-screen status               // how many
+             // tracked frames in a row the middle of the screen has pointed at a good plane
+static const float maxPlaceDistance = 3.0f; // metres: ignore planes further away than this
 
 void ArPlanesBeginFrame()
 {
-    drawPlaneCount = 0;   // refilled by ArPlanesRefresh, only from a frame that updated
+    drawPlaneCount = 0; // refilled by ArPlanesRefresh, only from a frame that updated
 }
 
-void ArPlanesClearMarker()
-{
-    markerState = 0;
-}
+void ArPlanesClearMarker() { markerState = 0; }
 
 void ArPlanesRefresh()
 {
-    if(sessionList != nullptr)
+    if (sessionList != nullptr)
     {
-        ArSession_getAllTrackables(session, AR_TRACKABLE_PLANE, sessionList);   // fill the list first
+        ArSession_getAllTrackables(session, AR_TRACKABLE_PLANE, sessionList); // fill the list first
         int32_t n{};
-        ArTrackableList_getSize(session, sessionList, &n);                      // then count it
+        ArTrackableList_getSize(session, sessionList, &n); // then count it
         planeCount = n;
         static int32_t lastPlaneCount = -1;
-        if(n != lastPlaneCount)
+        if (n != lastPlaneCount)
         {
             lastPlaneCount = n;
             LOGI("Planes detected: (%d)", n);
@@ -68,12 +67,12 @@ void ArPlanesRefresh()
         static int planeLogFrames = 0;
         const bool logPlanes = (n > 0 && ++planeLogFrames % 60 == 0);
 
-        if(n > 0 && planeCentrePose == nullptr)
+        if (n > 0 && planeCentrePose == nullptr)
         {
             ArPose_create(session, nullptr, &planeCentrePose);
         }
 
-        for(int32_t i = 0; i < n; ++i)
+        for (int32_t i = 0; i < n; ++i)
         {
             ArTrackable* trackable = nullptr;
             ArTrackableList_acquireItem(session, sessionList, i, &trackable);
@@ -90,9 +89,11 @@ void ArPlanesRefresh()
             ArPlane_getExtentZ(session, plane, &extentZ);
             ArPlane_getCenterPose(session, plane, planeCentrePose);
 
-            // Worth drawing: a floor or table that ARCore is tracking right now, not merged into another, with a real size.
-            if(parent == nullptr && planeType == AR_PLANE_HORIZONTAL_UPWARD_FACING && planeState == AR_TRACKING_STATE_TRACKING
-               && extentX > 0.02f && extentZ > 0.02f && drawPlaneCount < maxDrawPlanes)
+            // Worth drawing: a floor or table that ARCore is tracking right now, not merged into another, with a real
+            // size.
+            if (parent == nullptr && planeType == AR_PLANE_HORIZONTAL_UPWARD_FACING &&
+                planeState == AR_TRACKING_STATE_TRACKING && extentX > 0.02f && extentZ > 0.02f &&
+                drawPlaneCount < maxDrawPlanes)
             {
                 ArPose_getMatrix(session, planeCentrePose, drawPlaneMatrix[drawPlaneCount]);
                 drawPlaneExtent[drawPlaneCount][0] = extentX;
@@ -100,16 +101,18 @@ void ArPlanesRefresh()
                 ++drawPlaneCount;
             }
 
-            if(logPlanes)
+            if (logPlanes)
             {
                 float raw[7];
                 ArPose_getPoseRaw(session, planeCentrePose, raw);
                 LOGI("  Plane %d: %s, %s%s, y %.2f m, size %.2f x %.2f m", i,
-                     planeType == AR_PLANE_HORIZONTAL_UPWARD_FACING ? "horizontal, faces up" : planeType == AR_PLANE_HORIZONTAL_DOWNWARD_FACING ? "horizontal, faces down" : "vertical",
-                     planeState == AR_TRACKING_STATE_TRACKING ? "tracked" : "not tracked", parent != nullptr ? ", merged into another" : "",
-                     raw[5], extentX, extentZ);
+                     planeType == AR_PLANE_HORIZONTAL_UPWARD_FACING     ? "horizontal, faces up"
+                     : planeType == AR_PLANE_HORIZONTAL_DOWNWARD_FACING ? "horizontal, faces down"
+                                                                        : "vertical",
+                     planeState == AR_TRACKING_STATE_TRACKING ? "tracked" : "not tracked",
+                     parent != nullptr ? ", merged into another" : "", raw[5], extentX, extentZ);
             }
-            if(parent != nullptr)
+            if (parent != nullptr)
             {
                 ArTrackable_release(ArAsTrackable(parent));
             }
@@ -131,7 +134,7 @@ void ArPlanesRefresh()
  */
 void ArPlanesPlace(ArCamera* camera)
 {
-    if(hitList == nullptr)
+    if (hitList == nullptr)
     {
         ArHitResultList_create(session, &hitList);
         ArHitResult_create(session, &hitResult);
@@ -145,13 +148,13 @@ void ArPlanesPlace(ArCamera* camera)
 
     const char* result = "no hit";
     float distance = 0.0f;
-    float below = 0.0f;       // metres between the phone and the plane (positive = the plane is below the phone)
+    float below = 0.0f; // metres between the phone and the plane (positive = the plane is below the phone)
     float extentX = 0.0f;
     float extentZ = 0.0f;
     bool canPlace = false;
     bool foundPlane = false;
 
-    for(int32_t i = 0; i < count && !foundPlane; ++i)
+    for (int32_t i = 0; i < count && !foundPlane; ++i)
     {
         ArHitResultList_getItem(session, hitList, i, hitResult);
 
@@ -160,11 +163,11 @@ void ArPlanesPlace(ArCamera* camera)
         ArTrackableType type = AR_TRACKABLE_NOT_VALID;
         ArTrackable_getType(session, trackable, &type);
 
-        if(type != AR_TRACKABLE_PLANE)
+        if (type != AR_TRACKABLE_PLANE)
         {
             result = "only loose points so far, no plane";
             ArTrackable_release(trackable);
-            continue;                          // a feature point can sort in front of a plane: keep looking
+            continue; // a feature point can sort in front of a plane: keep looking
         }
 
         foundPlane = true;
@@ -187,26 +190,26 @@ void ArPlanesPlace(ArCamera* camera)
         ArCamera_getPose(session, camera, cameraPose);
         float cameraRaw[7];
         ArPose_getPoseRaw(session, cameraPose, cameraRaw);
-        below = cameraRaw[5] - hitRaw[5];      // y is up in ARCore's world
+        below = cameraRaw[5] - hitRaw[5]; // y is up in ARCore's world
 
-        if(parent != nullptr)
+        if (parent != nullptr)
         {
             result = "a plane that was merged into another one";
             ArTrackable_release(ArAsTrackable(parent));
         }
-        else if(planeType != AR_PLANE_HORIZONTAL_UPWARD_FACING)
+        else if (planeType != AR_PLANE_HORIZONTAL_UPWARD_FACING)
         {
             result = "a plane, but not a floor or table";
         }
-        else if(planeState != AR_TRACKING_STATE_TRACKING)
+        else if (planeState != AR_TRACKING_STATE_TRACKING)
         {
             result = "horizontal plane, not tracked right now";
         }
-        else if(!inside)
+        else if (!inside)
         {
             result = "horizontal plane, outside its edge";
         }
-        else if(distance > maxPlaceDistance)
+        else if (distance > maxPlaceDistance)
         {
             result = "horizontal plane, too far away";
         }
@@ -219,16 +222,16 @@ void ArPlanesPlace(ArCamera* camera)
     }
 
     markerState = 0;
-    if(foundPlane)
+    if (foundPlane)
     {
-        ArPose_getMatrix(session, hitPose, markerMatrix);   // hitPose holds the touch point of the plane found above
+        ArPose_getMatrix(session, hitPose, markerMatrix); // hitPose holds the touch point of the plane found above
         markerState = canPlace ? 2 : 1;
         hitDistance = distance;
         hitBelow = below;
     }
 
     static const char* lastResult = nullptr;
-    if(result != lastResult)
+    if (result != lastResult)
     {
         lastResult = result;
         LOGI("Centre ray: %s", result);
@@ -236,13 +239,13 @@ void ArPlanesPlace(ArCamera* camera)
     placementResult = result;
 
     validHitFrames = canPlace ? validHitFrames + 1 : 0;
-    if(validHitFrames < framesToHold)
+    if (validHitFrames < framesToHold)
     {
         return;
     }
 
     const ArStatus status = ArHitResult_acquireNewAnchor(session, hitResult, &anchor);
-    if(status != AR_SUCCESS)
+    if (status != AR_SUCCESS)
     {
         LOGI("Anchor failed to create (%d)", static_cast<int>(status));
         anchor = nullptr;
@@ -250,20 +253,21 @@ void ArPlanesPlace(ArCamera* camera)
     }
     else
     {
-        LOGI("Anchor created on a plane: %.2f m away, %.2f m below the phone, plane size %.2f x %.2f m", distance, below, extentX, extentZ);
+        LOGI("Anchor created on a plane: %.2f m away, %.2f m below the phone, plane size %.2f x %.2f m", distance,
+             below, extentX, extentZ);
     }
 }
 
 const char* ArPlanesStatus(char* text, std::size_t size)
 {
     (void)size; // the texts below were sized for the 96-char buffer the caller passes
-    if(placementResult == nullptr || std::strcmp(placementResult, "no hit") == 0)
+    if (placementResult == nullptr || std::strcmp(placementResult, "no hit") == 0)
     {
-        if(planeCount > 0 && drawPlaneCount == 0)
+        if (planeCount > 0 && drawPlaneCount == 0)
         {
             std::snprintf(text, size, "AR: scanning - %d plane(s) seen but none tracked yet", planeCount);
         }
-        else if(drawPlaneCount > 0)
+        else if (drawPlaneCount > 0)
         {
             std::snprintf(text, size, "AR: scanning - %d usable plane(s), aim the centre at one", drawPlaneCount);
         }
@@ -273,14 +277,16 @@ const char* ArPlanesStatus(char* text, std::size_t size)
         }
         return text;
     }
-    if(std::strcmp(placementResult, "horizontal plane, inside its edge") == 0)
+    if (std::strcmp(placementResult, "horizontal plane, inside its edge") == 0)
     {
-        std::snprintf(text, size, "AR: PLANE FOUND %.1f m away, %.1f m below - hold steady (%d/%d)", hitDistance, hitBelow, validHitFrames, framesToHold);
+        std::snprintf(text, size, "AR: PLANE FOUND %.1f m away, %.1f m below - hold steady (%d/%d)", hitDistance,
+                      hitBelow, validHitFrames, framesToHold);
         return text;
     }
-    if(markerState != 0)
+    if (markerState != 0)
     {
-        std::snprintf(text, size, "AR: scanning - %s (%.1f m away, %.1f m below)", placementResult, hitDistance, hitBelow);
+        std::snprintf(text, size, "AR: scanning - %s (%.1f m away, %.1f m below)", placementResult, hitDistance,
+                      hitBelow);
         return text;
     }
     std::snprintf(text, size, "AR: scanning - %s", placementResult);
@@ -289,20 +295,20 @@ const char* ArPlanesStatus(char* text, std::size_t size)
 
 void ArPlanesShutdown()
 {
-    if(hitPose != nullptr)
+    if (hitPose != nullptr)
     {
         ArPose_destroy(hitPose);
     }
     hitPose = nullptr;
 
-    if(cameraPose != nullptr)
+    if (cameraPose != nullptr)
     {
         ArPose_destroy(cameraPose);
     }
     cameraPose = nullptr;
     validHitFrames = 0;
 
-    if(planeCentrePose != nullptr)
+    if (planeCentrePose != nullptr)
     {
         ArPose_destroy(planeCentrePose);
     }
@@ -312,13 +318,13 @@ void ArPlanesShutdown()
     planeCount = 0;
     placementResult = nullptr;
 
-    if(hitResult != nullptr)
+    if (hitResult != nullptr)
     {
         ArHitResult_destroy(hitResult);
     }
     hitResult = nullptr;
 
-    if(hitList != nullptr)
+    if (hitList != nullptr)
     {
         ArHitResultList_destroy(hitList);
     }
@@ -336,16 +342,16 @@ void ArPlanesShutdown()
  */
 int ArGetPlacementMarker(float* matrix)
 {
-    if(anchor != nullptr)
+    if (anchor != nullptr)
     {
-        if(!anchorPoseValid)
+        if (!anchorPoseValid)
         {
             return 0;
         }
         std::memcpy(matrix, lastAnchorMatrix, sizeof(lastAnchorMatrix));
         return 3;
     }
-    if(markerState == 0)
+    if (markerState == 0)
     {
         return 0;
     }
@@ -364,9 +370,9 @@ int ArGetPlacementMarker(float* matrix)
  */
 int ArGetPlanes(float* matrices, float* extents, int maxCount)
 {
-    if(!placeOnTables)
+    if (!placeOnTables)
     {
-        return 0;   // card-only placement: the planes are not used, and drawn they just cover the camera picture
+        return 0; // card-only placement: the planes are not used, and drawn they just cover the camera picture
     }
     const int count = drawPlaneCount < maxCount ? drawPlaneCount : maxCount;
     std::memcpy(matrices, drawPlaneMatrix, sizeof(float) * 16 * static_cast<std::size_t>(count));

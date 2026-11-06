@@ -1,35 +1,27 @@
 #include "ARcore.hpp"
-#include "AR/ArModules.hpp"
-#include "arcore_c_api.h"
-#include <android/log.h>
-#include <GLES3/gl3.h>
-#include <GLES2/gl2ext.h>
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <vector>
+
+#include "AR/ArModules.hpp" // ARCore, GLES, the standard headers and the shared AR state, for every AR file
 
 // The one shared AR state (see AR/ArModules.hpp). Every module links to the parts it uses.
 ArContext gAr;
 
 // Shared AR state this module uses (owned by ArContext, see AR/ArModules.hpp).
-static ArSession*&       session             = gAr.session;
-static ArFrame*&         sessionFrame        = gAr.sessionFrame;
-static ArTrackableList*& sessionList         = gAr.sessionList;
-static ArAnchor*&        anchor              = gAr.anchor;
-static bool&             anchorOnCard        = gAr.anchorOnCard;
-static bool&             anchorTracking      = gAr.anchorTracking;
-static int&              cameraTrackingState = gAr.cameraTrackingState;
-static float (&lastAnchorMatrix)[16]         = gAr.lastAnchorMatrix;
-static bool&             anchorPoseValid     = gAr.anchorPoseValid;
-static float (&lastView)[16]                 = gAr.lastView;
-static float (&lastProjection)[16]           = gAr.lastProjection;
-static int&              displayWidth        = gAr.displayWidth;
-static int&              displayHeight       = gAr.displayHeight;
-static GLuint&           cameraTexture       = gAr.cameraTexture;
-static bool&             cardCovered         = gAr.cardCovered;
-static bool&             cameraBlocked       = gAr.cameraBlocked;
+static ArSession*& session = gAr.Session;
+static ArFrame*& sessionFrame = gAr.SessionFrame;
+static ArTrackableList*& sessionList = gAr.SessionList;
+static ArAnchor*& anchor = gAr.Anchor;
+static bool& anchorOnCard = gAr.AnchorOnCard;
+static bool& anchorTracking = gAr.AnchorTracking;
+static int& cameraTrackingState = gAr.CameraTrackingState;
+static float (&lastAnchorMatrix)[16] = gAr.LastAnchorMatrix;
+static bool& anchorPoseValid = gAr.AnchorPoseValid;
+static float (&lastView)[16] = gAr.LastView;
+static float (&lastProjection)[16] = gAr.LastProjection;
+static int& displayWidth = gAr.DisplayWidth;
+static int& displayHeight = gAr.DisplayHeight;
+static GLuint& cameraTexture = gAr.CameraTexture;
+static bool& cardCovered = gAr.CardCovered;
+static bool& cameraBlocked = gAr.CameraBlocked;
 
 // Private to the core
 static ArConfig* sessionConfig = nullptr;
@@ -38,8 +30,8 @@ static ArPose* anchorPoseHandle = nullptr;
 static int displayRotation = 0;
 static bool geometryDirty = true;
 static bool frameUpdated = false;
-static int framesSinceTracking = 1000;      // 1000 means "never tracked yet"
-static const int holdFrames = 15;           // keep using the last good camera for this many frames after tracking drops
+static int framesSinceTracking = 1000; // 1000 means "never tracked yet"
+static const int holdFrames = 15;      // keep using the last good camera for this many frames after tracking drops
 
 /**
  * @brief   Checks that the phone supports ARCore and that it is installed.
@@ -51,32 +43,33 @@ static const int holdFrames = 15;           // keep using the last good camera f
  * @return  true if ARCore is ready and a session can be created, otherwise
  *          false (call again later).
  */
-bool ArInitialise(void *env, void *activity)
+bool ArInitialise(void* env, void* activity)
 {
     // Check if mobile phone has been installed
     static bool installRequested = false;
-    
+
     ArAvailability availability;
     ArCoreApk_checkAvailability(env, activity, &availability);
 
-    if(availability == AR_AVAILABILITY_UNSUPPORTED_DEVICE_NOT_CAPABLE)
+    if (availability == AR_AVAILABILITY_UNSUPPORTED_DEVICE_NOT_CAPABLE)
     {
         LOGI("AR not supported by this device");
         return false;
     }
-    else if(availability == AR_AVAILABILITY_SUPPORTED_NOT_INSTALLED || availability == AR_AVAILABILITY_SUPPORTED_APK_TOO_OLD)
+    else if (availability == AR_AVAILABILITY_SUPPORTED_NOT_INSTALLED ||
+             availability == AR_AVAILABILITY_SUPPORTED_APK_TOO_OLD)
     {
         LOGI("AR supported but not installed or updated");
         ArInstallStatus installStatus;
         const ArStatus status = ArCoreApk_requestInstall(env, activity, !installRequested, &installStatus);
         installRequested = true;
-        if(status == AR_SUCCESS && installStatus == AR_INSTALL_STATUS_INSTALLED)
+        if (status == AR_SUCCESS && installStatus == AR_INSTALL_STATUS_INSTALLED)
         {
             return true;
         }
         return false;
     }
-    else if(availability == AR_AVAILABILITY_SUPPORTED_INSTALLED)
+    else if (availability == AR_AVAILABILITY_SUPPORTED_INSTALLED)
     {
         LOGI("AR is installed");
         return true;
@@ -99,12 +92,12 @@ bool ArInitialise(void *env, void *activity)
  * @return  true if the session, settings and frame all exist afterwards,
  *          otherwise false.
  */
-bool ArSessionCreate(void *env, void *activity)
+bool ArSessionCreate(void* env, void* activity)
 {
-    if(session == nullptr)
+    if (session == nullptr)
     {
         const ArStatus status = ArSession_create(env, activity, &session);
-        if(status != AR_SUCCESS)
+        if (status != AR_SUCCESS)
         {
             LOGI("AR session failed to create (%d)", static_cast<int>(status));
             session = nullptr;
@@ -112,14 +105,14 @@ bool ArSessionCreate(void *env, void *activity)
         }
     }
 
-    if(sessionConfig == nullptr)
+    if (sessionConfig == nullptr)
     {
         ArConfig_create(session, &sessionConfig);
         ArConfig_setPlaneFindingMode(session, sessionConfig, AR_PLANE_FINDING_MODE_HORIZONTAL);
-        ArCardConfigure(sessionConfig);    // the printed card's picture, if Kotlin sent one (ArCard)
-        ArDepthConfigure(sessionConfig);   // depth on when the phone supports it (ArDepth)
+        ArCardConfigure(sessionConfig);  // the printed card's picture, if Kotlin sent one (ArCard)
+        ArDepthConfigure(sessionConfig); // depth on when the phone supports it (ArDepth)
         const ArStatus status = ArSession_configure(session, sessionConfig);
-        if(status != AR_SUCCESS)
+        if (status != AR_SUCCESS)
         {
             LOGI("AR session failed to configure (%d)", static_cast<int>(status));
             ArConfig_destroy(sessionConfig);
@@ -128,12 +121,12 @@ bool ArSessionCreate(void *env, void *activity)
         }
     }
 
-    if(sessionList == nullptr)
+    if (sessionList == nullptr)
     {
         ArTrackableList_create(session, &sessionList);
     }
 
-    if(sessionFrame == nullptr)
+    if (sessionFrame == nullptr)
     {
         ArFrame_create(session, &sessionFrame);
     }
@@ -149,7 +142,7 @@ bool ArSessionCreate(void *env, void *activity)
  */
 bool ArSessionResume()
 {
-    if(session == nullptr)
+    if (session == nullptr)
     {
         LOGI("There's no session running.");
         return false;
@@ -157,7 +150,7 @@ bool ArSessionResume()
 
     ArStatus status = ArSession_resume(session);
 
-    if(status != AR_SUCCESS)
+    if (status != AR_SUCCESS)
     {
         LOGI("AR Session failed to Start or Resume. Error: (%d)", static_cast<int>(status));
         return false;
@@ -180,7 +173,7 @@ bool ArSessionResume()
  */
 bool ArSessionPause()
 {
-    if(session == nullptr)
+    if (session == nullptr)
     {
         LOGI("There's no session running.");
         return false;
@@ -188,7 +181,7 @@ bool ArSessionPause()
 
     ArStatus status = ArSession_pause(session);
 
-    if(status != AR_SUCCESS)
+    if (status != AR_SUCCESS)
     {
         LOGI("AR Session failed to Pause. Error: (%d)", static_cast<int>(status));
         return false;
@@ -204,25 +197,25 @@ bool ArSessionPause()
  */
 void ArSessionDestroy()
 {
-    if(sessionFrame != nullptr)
+    if (sessionFrame != nullptr)
     {
         ArFrame_destroy(sessionFrame);
     }
     sessionFrame = nullptr;
-    
-    if(sessionConfig != nullptr)
+
+    if (sessionConfig != nullptr)
     {
         ArConfig_destroy(sessionConfig);
     }
     sessionConfig = nullptr;
 
-    if(sessionList != nullptr)
+    if (sessionList != nullptr)
     {
         ArTrackableList_destroy(sessionList);
     }
     sessionList = nullptr;
 
-    if(anchor != nullptr)
+    if (anchor != nullptr)
     {
         ArAnchor_detach(session, anchor);
         ArAnchor_release(anchor);
@@ -235,7 +228,7 @@ void ArSessionDestroy()
     ArDepthShutdown();
     ArPlanesShutdown();
 
-    if(anchorPoseHandle != nullptr)
+    if (anchorPoseHandle != nullptr)
     {
         ArPose_destroy(anchorPoseHandle);
     }
@@ -243,7 +236,7 @@ void ArSessionDestroy()
     anchorPoseValid = false;
     cameraTrackingState = -1;
 
-    if(session != nullptr)
+    if (session != nullptr)
     {
         ArSession_destroy(session);
     }
@@ -270,10 +263,10 @@ void ArCameraInit()
 
     LOGI("Camera texture created: %u", cameraTexture);
 
-    ArDepthInitGL();     // the depth texture for this GL context (ArDepth)
+    ArDepthInitGL(); // the depth texture for this GL context (ArDepth)
 
     textureBound = false;
-    ArCamPictureInit();  // the camera-picture shader (ArCamera)
+    ArCamPictureInit(); // the camera-picture shader (ArCamera)
 }
 
 /**
@@ -286,21 +279,21 @@ void ArCameraInit()
 void ArCameraUpdate()
 {
     frameUpdated = false;
-    ArPlanesBeginFrame();   // planes are refilled below, only from a frame that updated successfully
+    ArPlanesBeginFrame(); // planes are refilled below, only from a frame that updated successfully
 
-    if(session == nullptr || sessionFrame == nullptr || cameraTexture == 0)
+    if (session == nullptr || sessionFrame == nullptr || cameraTexture == 0)
     {
         return;
     }
 
-    if(!textureBound)
+    if (!textureBound)
     {
         ArSession_setCameraTextureName(session, cameraTexture);
         textureBound = true;
         LOGI("Camera texture (%u) given to ARCore", cameraTexture);
     }
 
-    if(geometryDirty)
+    if (geometryDirty)
     {
         ArSession_setDisplayGeometry(session, displayRotation, displayWidth, displayHeight);
         geometryDirty = false;
@@ -309,7 +302,7 @@ void ArCameraUpdate()
 
     static int lastUpdateStatus = 12345;
     const ArStatus updateStatus = ArSession_update(session, sessionFrame);
-    if(static_cast<int>(updateStatus) != lastUpdateStatus)
+    if (static_cast<int>(updateStatus) != lastUpdateStatus)
     {
         lastUpdateStatus = static_cast<int>(updateStatus);
         LOGI("ArSession_update status: (%d)", lastUpdateStatus);
@@ -317,19 +310,19 @@ void ArCameraUpdate()
 
     static int frameCount = 0;
     ++frameCount;
-    if(frameCount % 60 == 0)
+    if (frameCount % 60 == 0)
     {
         LOGI("ArCameraUpdate alive: %d frames, update status %d", frameCount, static_cast<int>(updateStatus));
     }
-    
-    if(updateStatus != AR_SUCCESS)
+
+    if (updateStatus != AR_SUCCESS)
     {
         return;
     }
 
     frameUpdated = true;
 
-    ArPlanesRefresh();   // planes this frame (ArPlanes)
+    ArPlanesRefresh(); // planes this frame (ArPlanes)
 }
 
 /**
@@ -341,7 +334,7 @@ void ArCameraDraw()
 {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-    if(frameUpdated)
+    if (frameUpdated)
     {
         ArCamPictureDraw();
     }
@@ -375,14 +368,14 @@ void ArCameraResize(int width, int height, int rotation)
  */
 bool ArGetCameraMatrices(float* view, float* projection)
 {
-    if(session == nullptr || sessionFrame == nullptr || frameUpdated == false)
+    if (session == nullptr || sessionFrame == nullptr || frameUpdated == false)
     {
         return false;
     }
 
     ArCamera* camera = nullptr;
     ArFrame_acquireCamera(session, sessionFrame, &camera);
-    if(camera == nullptr)
+    if (camera == nullptr)
     {
         return false;
     }
@@ -393,70 +386,76 @@ bool ArGetCameraMatrices(float* view, float* projection)
     cameraTrackingState = static_cast<int>(trackingState);
 
     static int lastTrackingState = -1;
-    if(static_cast<int>(trackingState) != lastTrackingState)
+    if (static_cast<int>(trackingState) != lastTrackingState)
     {
         lastTrackingState = static_cast<int>(trackingState);
         ArTrackingFailureReason failureReason = AR_TRACKING_FAILURE_REASON_NONE;
         ArCamera_getTrackingFailureReason(session, camera, &failureReason);
-        LOGI("Tracking state: %s (failure reason %d)", trackingState == AR_TRACKING_STATE_TRACKING ? "TRACKING" : trackingState == AR_TRACKING_STATE_PAUSED   ? "PAUSED" : "STOPPED", static_cast<int>(failureReason));
+        LOGI("Tracking state: %s (failure reason %d)",
+             trackingState == AR_TRACKING_STATE_TRACKING ? "TRACKING"
+             : trackingState == AR_TRACKING_STATE_PAUSED ? "PAUSED"
+                                                         : "STOPPED",
+             static_cast<int>(failureReason));
     }
 
-    if(trackingState == AR_TRACKING_STATE_TRACKING)
+    if (trackingState == AR_TRACKING_STATE_TRACKING)
     {
         ArCamera_getViewMatrix(session, camera, lastView);
         ArCamera_getProjectionMatrix(session, camera, 0.05f, 100.0f, lastProjection);
         framesSinceTracking = 0;
-        ArCardUpdate(camera);          // the printed card wins: it places the anchor, or moves a table-placed one onto the card
-        ArDepthUpdate();                // after the camera matrices above: ArCover projects the card with them
-        ArCoverUpdate();                // card covered / camera blocked, from this frame's depth picture
+        ArCardUpdate(camera); // the printed card wins: it places the anchor, or moves a table-placed one onto the card
+        ArDepthUpdate();      // after the camera matrices above: ArCover projects the card with them
+        ArCoverUpdate();      // card covered / camera blocked, from this frame's depth picture
         anchorTracking = false;
-        if(anchor != nullptr)
+        if (anchor != nullptr)
         {
             ArTrackingState anchorState = AR_TRACKING_STATE_STOPPED;
             ArAnchor_getTrackingState(session, anchor, &anchorState);
             anchorTracking = anchorState == AR_TRACKING_STATE_TRACKING;
             static int lastAnchorState = -1;
-            if(static_cast<int>(anchorState) != lastAnchorState)
+            if (static_cast<int>(anchorState) != lastAnchorState)
             {
                 lastAnchorState = static_cast<int>(anchorState);
-                LOGI("Anchor state: %s", anchorState == AR_TRACKING_STATE_TRACKING ? "TRACKING" : anchorState == AR_TRACKING_STATE_PAUSED ? "PAUSED" : "STOPPED");
+                LOGI("Anchor state: %s", anchorState == AR_TRACKING_STATE_TRACKING ? "TRACKING"
+                                         : anchorState == AR_TRACKING_STATE_PAUSED ? "PAUSED"
+                                                                                   : "STOPPED");
             }
-            if(anchorState == AR_TRACKING_STATE_TRACKING)
+            if (anchorState == AR_TRACKING_STATE_TRACKING)
             {
-                if(anchorPoseHandle == nullptr)
+                if (anchorPoseHandle == nullptr)
                 {
-                    ArPose_create(session, nullptr, &anchorPoseHandle);   // nullptr = start as the identity pose
+                    ArPose_create(session, nullptr, &anchorPoseHandle); // nullptr = start as the identity pose
                 }
-                ArAnchor_getPose(session, anchor, anchorPoseHandle);        // fill the handle with the anchor's current pose
+                ArAnchor_getPose(session, anchor, anchorPoseHandle); // fill the handle with the anchor's current pose
                 ArPose_getMatrix(session, anchorPoseHandle, lastAnchorMatrix);
                 anchorPoseValid = true;
                 float raw[7];
-                ArPose_getPoseRaw(session, anchorPoseHandle, raw);       // qx qy qz qw tx ty tz
+                ArPose_getPoseRaw(session, anchorPoseHandle, raw); // qx qy qz qw tx ty tz
                 static int anchorLogCount = 0;
-                if(++anchorLogCount % 60 == 0)
+                if (++anchorLogCount % 60 == 0)
                 {
                     LOGI("Anchor at (%.3f, %.3f, %.3f)", raw[4], raw[5], raw[6]);
                 }
             }
         }
-        else if(placeOnTables)
+        else if (placeOnTables)
         {
-            ArPlanesPlace(camera);      // scanning: wait until the middle of the screen steadily points at a table or floor
+            ArPlanesPlace(camera); // scanning: wait until the middle of the screen steadily points at a table or floor
         }
     }
-    else if(framesSinceTracking < 1000)
+    else if (framesSinceTracking < 1000)
     {
         ++framesSinceTracking;
     }
-    if(trackingState != AR_TRACKING_STATE_TRACKING)
+    if (trackingState != AR_TRACKING_STATE_TRACKING)
     {
         ArPlanesClearMarker();
-        ArDepthInvalidate();     // the last depth picture no longer lines up with the screen
+        ArDepthInvalidate(); // the last depth picture no longer lines up with the screen
         anchorTracking = false;
     }
     ArCamera_release(camera);
 
-    if(framesSinceTracking > holdFrames)
+    if (framesSinceTracking > holdFrames)
     {
         return false;
     }
@@ -475,7 +474,7 @@ bool ArIsStationShown()
 
 bool ArGetAnchorPose(float* matrix)
 {
-    if(!anchorPoseValid)
+    if (!anchorPoseValid)
     {
         return false;
     }
@@ -493,39 +492,39 @@ const char* ArGetPlacementStatus()
 {
     static char text[96];
 
-    if(session == nullptr)
+    if (session == nullptr)
     {
         return "AR: no session";
     }
-    if(anchor != nullptr)
+    if (anchor != nullptr)
     {
-        if(cameraTrackingState != static_cast<int>(AR_TRACKING_STATE_TRACKING))
+        if (cameraTrackingState != static_cast<int>(AR_TRACKING_STATE_TRACKING))
         {
             return "AR: tracking lost - station hidden, move slowly";
         }
-        if(!anchorTracking)
+        if (!anchorTracking)
         {
             return "AR: anchor paused - station hidden, look at the card";
         }
-        if(cameraBlocked)
+        if (cameraBlocked)
         {
             return "AR: camera blocked - station hidden, uncover the lens";
         }
-        if(!anchorOnCard)
+        if (!anchorOnCard)
         {
             return "AR: PLACED on a plane";
         }
         return ArCardStatusPlaced(text, sizeof(text));
     }
-    if(cameraTrackingState != static_cast<int>(AR_TRACKING_STATE_TRACKING))
+    if (cameraTrackingState != static_cast<int>(AR_TRACKING_STATE_TRACKING))
     {
         return "AR: scanning - tracking lost, move slowly";
     }
-    if(char const* card = ArCardStatusScanning(text, sizeof(text)))   // the card is found but not placed yet
+    if (char const* card = ArCardStatusScanning(text, sizeof(text))) // the card is found but not placed yet
     {
         return card;
     }
-    if(!placeOnTables)
+    if (!placeOnTables)
     {
         return ArCardLoaded() ? "AR: looking for the card - point the camera at it"
                               : "AR: no card loaded (check AR.json) and table placement is off";
