@@ -25,6 +25,7 @@
 #include "Time.hpp"
 #include "EmbeddedAssets.hpp"
 #include "DefinitionLoader.hpp"
+#include "Profiler.hpp"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
@@ -118,6 +119,12 @@ Java_com_example_kopitwin_NativeCore_update(JNIEnv*, jobject)
     Core::Render();   // camera picture, then the equipment
 
     // Test logging lives in the shell so the core stays loop/platform-free.
+    if (Core::frameCount > 0 && !(Core::frameCount % 300)) // sandbox: every ~10 s, the profiler table to Logcat
+    {
+        char table[1024];
+        table[Profiler::Format(table, sizeof(table))] = '\0';
+        LOGI("PROFILE (ms, last 120 frames)\n%s", table);
+    }
     if (!(Core::frameCount % 60))
     {
         LOGI("frame %u, dt = %.2f ms, fps = %.1f",

@@ -1,5 +1,6 @@
 #include "ARcore.hpp"
 #include "arcore_c_api.h"
+#include "Profiler.hpp"
 #include <android/log.h>
 #include <GLES3/gl3.h>
 #include <GLES2/gl2ext.h>
@@ -69,10 +70,13 @@ static bool cardInView = false;                         // on-screen debug: the 
 static float cardDistanceNow = 0.0f;                    // on-screen debug: metres from the phone to the card, last seen
 static int cardRefineCount = 0;                         // on-screen debug: how often the anchor followed the card
 static float cardViewAngle = 0.0f;                      // on-screen debug: degrees off straight-on the phone sees the card, last seen
-static bool anchorTracking = false;                     // the anchor's own tracking state this frame (paused = do not trust it)
+static char cameraModeText[128] = "default (not chosen)";   // sandbox: which camera config was picked, logged again later
+static bool anchorTracking = false;                    // the anchor's own tracking state this frame (paused = do not trust it)
 
 // Depth (M2G05 extra): ARCore's depth picture hides the pieces behind real things (a hand), and says when the card is covered.
 static bool depthEnabled = false;                       // the phone supports depth and the session has it on
+static int depthTextureW = 0;                           // size depthTexture was allocated at (0 = not yet)
+static int depthTextureH = 0;
 static GLuint depthTexture = 0;                         // this frame's depth picture: millimetres, low byte in R, high byte in G
 static bool depthValid = false;                         // depthTexture holds this frame's picture
 static float depthUvTransform[9]{};                     // screen (0..1) -> depth picture (0..1), column-major 3x3
@@ -238,6 +242,44 @@ bool ArSessionCreate(void *env, void *activity)
             cardPixels.clear();
             cardPixels.shrink_to_fit();
         }
+        // Sandbox optimisation: the app is camera-bound (measured: ~31.7 of ~32 ms per frame is waiting for the
+        // camera, our own work is ~0.7 ms), so the only way to a smoother picture is a faster camera. Ask ARCore for
+        // a 60 fps camera; phones without one keep the default 30 fps. Must happen before the session first resumes.
+        {
+            ArCameraConfigFilter* fpsFilter = nullptr;
+            ArCameraConfigList* fpsConfigs = nullptr;
+            ArCameraConfigFilter_create(session, &fpsFilter);
+            ArCameraConfigFilter_setTargetFps(session, fpsFilter, AR_CAMERA_CONFIG_TARGET_FPS_60);
+            ArCameraConfigList_create(session, &fpsConfigs);
+            ArSession_getSupportedCameraConfigsWithFilter(session, fpsFilter, fpsConfigs);
+            int32_t fpsCount = 0;
+            ArCameraConfigList_getSize(session, fpsConfigs, &fpsCount);
+            if(fpsCount > 0)
+            {
+                ArCameraConfig* fastCamera = nullptr;
+                ArCameraConfig_create(session, &fastCamera);
+                ArCameraConfigList_getItem(session, fpsConfigs, 0, fastCamera);   // ARCore lists the best one first
+                int32_t minFps = 0;
+                int32_t maxFps = 0;
+                int32_t imageW = 0;
+                int32_t imageH = 0;
+                ArCameraConfig_getFpsRange(session, fastCamera, &minFps, &maxFps);
+                ArCameraConfig_getImageDimensions(session, fastCamera, &imageW, &imageH);
+                const ArStatus fpsStatus = ArSession_setCameraConfig(session, fastCamera);
+                std::snprintf(cameraModeText, sizeof(cameraModeText), "%d 60 fps configs; using %dx%d at %d-%d fps (status %d)",
+                              fpsCount, imageW, imageH, minFps, maxFps, static_cast<int>(fpsStatus));
+                LOGI("Camera: %s", cameraModeText);
+                ArCameraConfig_destroy(fastCamera);
+            }
+            else
+            {
+                std::snprintf(cameraModeText, sizeof(cameraModeText), "no 60 fps config on this phone, staying at 30 fps");
+                LOGI("Camera: %s", cameraModeText);
+            }
+            ArCameraConfigList_destroy(fpsConfigs);
+            ArCameraConfigFilter_destroy(fpsFilter);
+        }
+
         int32_t depthSupported = 0;
         ArSession_isDepthModeSupported(session, AR_DEPTH_MODE_AUTOMATIC, &depthSupported);
         depthEnabled = depthSupported != 0;
@@ -474,6 +516,8 @@ void ArCameraInit()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
     depthValid = false;
+    depthTextureW = 0;   // a new texture: the first upload must allocate it
+    depthTextureH = 0;
 
     textureBound = false;
     CameraDrawingInit();
@@ -511,7 +555,11 @@ void ArCameraUpdate()
     }
 
     static int lastUpdateStatus = 12345;
-    const ArStatus updateStatus = ArSession_update(session, sessionFrame);
+    ArStatus updateStatus;
+    {
+        PROFILE_SCOPE("AR wait");   // blocks until the camera's next frame: waiting, not work
+        updateStatus = ArSession_update(session, sessionFrame);
+    }
     if(static_cast<int>(updateStatus) != lastUpdateStatus)
     {
         lastUpdateStatus = static_cast<int>(updateStatus);
@@ -532,7 +580,9 @@ void ArCameraUpdate()
 
     frameUpdated = true;
 
-    if(sessionList != nullptr)
+    // Sandbox optimisation: card-only placement never uses the planes, so do not walk (and log) them every frame.
+    // The plane logging was also flooding Logcat, which then dropped important lines.
+    if(sessionList != nullptr && placeOnTables)
     {
         ArSession_getAllTrackables(session, AR_TRACKABLE_PLANE, sessionList);   // fill the list first
         int32_t n{};
@@ -607,6 +657,7 @@ void ArCameraUpdate()
  */
 void ArCameraDraw()
 {
+    PROFILE_SCOPE("Camera draw");
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     if(frameUpdated)
@@ -927,6 +978,7 @@ static void TryPlaceAnchorOnPlane(ArCamera* camera)
  */
 static void TryPlaceAnchorOnCard(ArCamera* camera)
 {
+    PROFILE_SCOPE("AR card");
     if(cardDatabase == nullptr)
     {
         return;
@@ -1254,8 +1306,15 @@ static void UpdateCardCovered()
  */
 static void UpdateDepth()
 {
+    PROFILE_SCOPE("AR depth");
     depthValid = false;
     cardCoveredFraction = -1.0f;
+    if(anchor == nullptr)
+    {
+        cameraBlocked = false;
+        cameraBlockedFrames = 0;
+        return;   // sandbox optimisation: nothing to hide or check until the station is placed
+    }
     if(depthEnabled && depthTexture != 0)
     {
         ArImage* depthImage = nullptr;
@@ -1275,7 +1334,18 @@ static void UpdateDepth()
                 glBindTexture(GL_TEXTURE_2D, depthTexture);
                 glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
                 glPixelStorei(GL_UNPACK_ROW_LENGTH, rowStride / 2);   // in pixels: rows may be padded
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, width, height, 0, GL_RG, GL_UNSIGNED_BYTE, data);
+                // Sandbox optimisation: allocate the texture once (or when the size changes), then only update the
+                // pixels, instead of making the driver re-create the texture every frame.
+                if(width != depthTextureW || height != depthTextureH)
+                {
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, width, height, 0, GL_RG, GL_UNSIGNED_BYTE, data);
+                    depthTextureW = width;
+                    depthTextureH = height;
+                }
+                else
+                {
+                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RG, GL_UNSIGNED_BYTE, data);
+                }
                 glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
                 glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
                 glBindTexture(GL_TEXTURE_2D, 0);
@@ -1326,7 +1396,8 @@ static void UpdateDepth()
                 if(!loggedSize)
                 {
                     loggedSize = true;
-                    LOGI("Depth picture: %d x %d", width, height);
+                    LOGI("Depth picture: %d x %d; camera mode: %s; depth %s", width, height, cameraModeText,
+                         depthEnabled ? "on" : "off");
                 }
             }
             ArImage_release(depthImage);

@@ -52,6 +52,9 @@ embed_assets(${GEN_DIR}/EmbeddedAssets.hpp
         Assets/Models/cup.obj
         Assets/Models/coffee_liquid.obj)
 
+# Sandbox: scoped profiler on for the phone build too (desktop CI already has it), to measure each system.
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE PROFILER_ENABLED)
+
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         ${CORE_INCLUDE_DIRS}
 	${GEN_DIR})

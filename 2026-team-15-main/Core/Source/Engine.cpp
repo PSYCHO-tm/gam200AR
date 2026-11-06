@@ -390,7 +390,10 @@ namespace
             if (world.runner->StartNext(errs)) LOGI("Scenario started: %s", world.runner->Current().c_str());
             else for (auto const& e : errs) LOGE("Scenario error: %s", e.c_str());
         }
-        ARTrackingState();
+        {
+            PROFILE_SCOPE("AR total");
+            ARTrackingState();
+        }
 #if defined(KOPI_HAS_GL)
         EquipmentScene::Get().Update(dt, Core::mInput.GetSnapshot(), gTracking, gView, gProjection, Core::viewportW,
                                      Core::viewportH);
@@ -487,6 +490,7 @@ void Core::Exit() {
 }
 void Core::Render()
 {
+    PROFILE_SCOPE("Render");
 #if defined(__ANDROID__)
     ArCameraDraw();
 #endif
@@ -523,6 +527,7 @@ void Core::OnResume()
 
 UI32 Core::GetOverlayText(char* buf, UI32 size)
 {
+    PROFILE_SCOPE("Overlay text");
 #if defined(__ANDROID__)
     char const* placementStatus = ArGetPlacementStatus();
 #else

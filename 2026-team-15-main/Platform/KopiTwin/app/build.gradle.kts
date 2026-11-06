@@ -45,8 +45,14 @@ android {
 
     buildTypes {
         release {
+            // Sandbox: signed with the debug key so the optimised (-O2, stripped) build installs for measuring.
+            // A real store release would use the team's own key instead.
+            signingConfig = signingConfigs.getByName("debug")
             optimization {
-                enable = true
+                // Sandbox: off. With it on, R8 renames kotlin.collections classes and the app crashes at start-up
+                // (IllegalAccessError in androidx.startup.InitializationProvider), before any of our code runs.
+                // The C++ is still built optimised (-O2) by the release build type.
+                enable = false
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }

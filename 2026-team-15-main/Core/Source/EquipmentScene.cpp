@@ -208,8 +208,7 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
     }
 
     // Selection becomes a plain tint colour here. The Renderer only knows colours and matrices.
-    std::vector<Renderer::MeshDraw> draws;
-    draws.reserve(library.items.size() + 1);
+    draws.clear(); // keeps its memory from last frame
 
     // The detected planes first, as see-through rectangles: the pieces and the debug square are drawn over them.
     // Only while scanning: once the station is placed they would just cover it.
@@ -278,8 +277,7 @@ void EquipmentScene::DrawLoader(float seconds, int viewportW, int viewportH)
     float const head        = std::fmod(seconds * stepsPerSec, static_cast<float>(dots));
     float const degToRad    = 3.14159265f / 180.0f;
 
-    std::vector<Renderer::MeshDraw> draws;
-    draws.reserve(dots);
+    draws.clear();
     for (int i = 0; i < dots; ++i)
     {
         float const angle = 90.0f - 360.0f * i / dots; // clockwise from the top

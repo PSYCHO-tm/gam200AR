@@ -7,6 +7,7 @@
 #include "Input.hpp"
 #include "Matrix.hpp"
 #include "EquipmentDef.hpp"
+#include "Renderer.hpp"
 
 // The equipment you see in AR: loads it, keeps it still in the room, selects it when you tap it, and draws it.
 // Everything runs on the GL thread, called from Core (Init / Update / Render), so nothing here needs a lock.
@@ -86,4 +87,5 @@ private:
     bool                       loaded = false;  // Init succeeded: meshes read and handed to the Renderer
     bool                       placed = false;  // an anchor pose has arrived at least once
     bool                       stationShown = false; // see SetStationShown
+    std::vector<Renderer::MeshDraw> draws;           // sandbox optimisation: this frame's draw list, reused (no new heap memory each frame)
 };
