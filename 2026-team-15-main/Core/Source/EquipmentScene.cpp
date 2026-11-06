@@ -1,5 +1,6 @@
 #include "EquipmentScene.hpp"
 
+#include <cmath>
 #include <cstring>
 #include <optional>
 #include <string>
@@ -12,12 +13,15 @@
 #include "ObjLoader.hpp"
 #include "PlatformLog.hpp"
 
+// The one scene. A function-local static: built on first use.
 EquipmentScene& EquipmentScene::Get()
 {
     static EquipmentScene instance;
     return instance;
 }
 
+// Android has no loose files to open, so CMake bakes the .obj text into the app (EmbeddedAssets.hpp) and this looks it
+// up by the same repo path Equipment.json uses. A linear search is fine: a handful of files, once at start-up.
 char const* EquipmentScene::FindAsset(char const* path)
 {
 #if defined(__ANDROID__)
@@ -57,6 +61,8 @@ MeshData EquipmentScene::MakeMarkerMesh()
     return marker;
 }
 
+// Reads every piece's mesh, measures its bounding box (for tap picking), precomputes its place on the anchor, and hands
+// all meshes to the Renderer. Stops at the first missing or broken mesh so the log names the exact file.
 bool EquipmentScene::Init(EquipmentLibrary loadedLibrary)
 {
     if (loaded)
@@ -110,6 +116,8 @@ bool EquipmentScene::Init(EquipmentLibrary loadedLibrary)
     return true;
 }
 
+// Tap picking: turn the tap into a ray through the camera (Raycast.hpp), test it against every piece's box in world
+// space (Collider.hpp), and select the nearest hit. A tap on empty space clears the selection.
 void EquipmentScene::Update(float /*dt*/, InputSnapshot const& input, bool tracking, Matrix4x4 const& view,
                             Matrix4x4 const& projection, int viewportW, int viewportH)
 {
@@ -118,9 +126,9 @@ void EquipmentScene::Update(float /*dt*/, InputSnapshot const& input, bool track
         return; // nothing to place, or no trustworthy camera: nothing to place, nothing to pick
     }
 
-    if (!placed)
+    if (!placed || !stationShown)
     {
-        return; // still scanning: the pieces are placed (and can be picked) only once ARCore gives an anchor pose
+        return; // still scanning, or hidden: the pieces can be picked only while they are on screen
     }
 
     if (input.Tapped)
@@ -164,6 +172,7 @@ void EquipmentScene::SetPlanes(std::vector<Matrix4x4> const& poses, std::vector<
     }
 }
 
+// Stores the debug square's state and pose for the next Draw.
 void EquipmentScene::SetMarker(int state, Matrix4x4 const& pose)
 {
     markerState = state;
@@ -177,6 +186,8 @@ void EquipmentScene::SetAnchorPose(Matrix4x4 const& pose)
     RefreshModels();   // every call after that follows the anchor, so picking and drawing use the corrected spot
 }
 
+// Recomputes every piece's world matrix from the latest anchor pose. Called on every anchor update, so picking (Update)
+// and drawing (Draw) always use the same, corrected spot.
 void EquipmentScene::RefreshModels()
 {
     models.clear();
@@ -187,6 +198,8 @@ void EquipmentScene::RefreshModels()
     }
 }
 
+// Builds this frame's draw list (planes while scanning, the pieces once placed and trusted, the debug square) and hands
+// it to the Renderer in one call. Order matters only for see-through items: they are listed after what they cover.
 void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
 {
     if (!loaded)
@@ -199,7 +212,8 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
     draws.reserve(library.items.size() + 1);
 
     // The detected planes first, as see-through rectangles: the pieces and the debug square are drawn over them.
-    if (meshes.size() > library.items.size())
+    // Only while scanning: once the station is placed they would just cover it.
+    if (!placed && meshes.size() > library.items.size())
     {
         for (Matrix4x4 const& planeModel : planeModels)
         {
@@ -212,7 +226,7 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
         }
     }
 
-    if (placed)
+    if (placed && stationShown)
     {
         for (std::size_t i = 0; i < library.items.size() && i < meshes.size(); ++i)
         {
@@ -227,7 +241,7 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
     }
 
     // The debug square: red = a plane the code won't use, yellow = a good plane (holding steady), green = the anchor.
-    if (markerState != 0 && meshes.size() > library.items.size())
+    if (markerState != 0 && (!placed || stationShown) && meshes.size() > library.items.size())
     {
         Renderer::MeshDraw marker;
         marker.meshIndex = library.items.size();
@@ -235,6 +249,7 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
         marker.color     = markerState == 1   ? Vector3D{0.9f, 0.2f, 0.2f}
                            : markerState == 2 ? Vector3D{0.95f, 0.8f, 0.1f}
                                               : Vector3D{0.2f, 0.8f, 0.3f};
+        marker.occludable = false; // a debug aid lying on the surface: depth would half-hide it
         draws.push_back(marker);
     }
 
@@ -243,4 +258,43 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
         return;
     }
     Renderer::Get().DrawMeshes(draws, view, projection);
+}
+
+void EquipmentScene::DrawLoader(float seconds, int viewportW, int viewportH)
+{
+    if (!loaded || meshes.size() <= library.items.size())
+    {
+        return;
+    }
+
+    // Straight onto the screen: view and projection are identity, so each model matrix places a dot in screen units
+    // (-1..1 across). x is squeezed by the screen's shape so the ring stays round.
+    float const aspect      = (viewportW > 0 && viewportH > 0) ? static_cast<float>(viewportW) / viewportH : 1.0f;
+    float const markerWidth = 0.12f;  // the square mesh's width
+    float const dotSize     = 0.022f; // in screen-height units
+    float const radius      = 0.07f;
+    int const   dots        = 10;
+    float const stepsPerSec = 10.0f;  // the bright dot moves one place every 0.1 s: one turn a second
+    float const head        = std::fmod(seconds * stepsPerSec, static_cast<float>(dots));
+    float const degToRad    = 3.14159265f / 180.0f;
+
+    std::vector<Renderer::MeshDraw> draws;
+    draws.reserve(dots);
+    for (int i = 0; i < dots; ++i)
+    {
+        float const angle = 90.0f - 360.0f * i / dots; // clockwise from the top
+        float const age   = std::fmod(head - i + dots, static_cast<float>(dots)) / dots; // 0 = the bright one, then fading
+        Renderer::MeshDraw dot;
+        dot.meshIndex  = library.items.size();
+        dot.model      = Matrix4x4::Scale(dotSize / markerWidth, 1.0f, dotSize / markerWidth) * // square, dot-sized
+                    Matrix4x4::RotateX(90.0f) *                                                // flat on the screen
+                    Matrix4x4::Translate(radius * std::cos(angle * degToRad), radius * std::sin(angle * degToRad), 0.0f) *
+                    Matrix4x4::Scale(1.0f / aspect, 1.0f, 1.0f);
+        dot.tint       = Vector3D{1.0f, 1.0f, 1.0f}; // tint 1 = plain white, no lighting
+        dot.tintAmount = 1.0f;
+        dot.alpha      = 0.15f + 0.7f * (1.0f - age);
+        dot.occludable = false; // a screen item: never hidden by the depth picture
+        draws.push_back(dot);
+    }
+    Renderer::Get().DrawMeshes(draws, Matrix4x4{}, Matrix4x4{});
 }

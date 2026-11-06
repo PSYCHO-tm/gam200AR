@@ -5,6 +5,9 @@
 #include <unordered_map>
 
 // One linked GPU program (vertex + fragment shader). Uniform locations are looked up once and cached.
+// The shader text comes in as strings: CMake turns Assets/Shader/*.vert|frag into lit_vert.hpp / lit_frag.hpp, so the
+// app needs no shader files at run time. The sources are written for OpenGL ES 3.0; on desktop they are rewritten to
+// GLSL 330 core before compiling (see ToDesktopGlsl in Shader.cpp).
 class Shader
 {
 public:
@@ -13,25 +16,26 @@ public:
 
     Shader(const Shader&)            = delete;
     Shader& operator=(const Shader&) = delete;
-    Shader(Shader&& other) noexcept;
+    Shader(Shader&& other) noexcept;            // moving hands the program over; 'other' is left empty
     Shader& operator=(Shader&& other) noexcept;
 
-    bool Load(const char* vertexSource, const char* fragmentSource);
-    void Destroy();
+    bool Load(const char* vertexSource, const char* fragmentSource); // compile + link; false (and logged) on any error
+    void Destroy();     // deletes the program (needs a live context)
     void ContextLost(); // forget the handle without deleting: the driver already freed it
 
-    void Use() const;
-    bool IsValid() const;
+    void Use() const;     // makes this the current program: call before the Set* functions
+    bool IsValid() const; // true once Load succeeded
 
-    void SetInt(const char* name, int value);
+    // Uniform setters. The program must be in use. A misspelled or unused name logs once and is then ignored.
+    void SetInt(const char* name, int value); // also for samplers: the value is the texture unit
     void SetFloat(const char* name, float value);
     void SetVec3(const char* name, const float* value);
-    void SetMat4(const char* name, const float* value);
+    void SetMat4(const char* name, const float* value); // 16 floats, column-major (Matrix4x4's memory, as it is)
 
 private:
-    GLint         Location(const char* name);
-    static GLuint Compile(GLenum type, const char* source);
+    GLint         Location(const char* name);                // cached glGetUniformLocation
+    static GLuint Compile(GLenum type, const char* source); // one stage; 0 on error (log printed)
 
-    GLuint                                 program{0};
-    std::unordered_map<std::string, GLint> locations{};
+    GLuint                                 program{0};       // 0 = not loaded
+    std::unordered_map<std::string, GLint> locations{};      // uniform name -> location (-1 kept too, so it logs once)
 };

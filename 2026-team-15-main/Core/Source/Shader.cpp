@@ -50,6 +50,8 @@ Shader& Shader::operator=(Shader&& other) noexcept
     return *this;
 }
 
+// Compiles one stage (vertex or fragment). On failure the driver's message is logged, so a typo in a .frag shows up
+// in Logcat instead of as a black screen.
 GLuint Shader::Compile(GLenum type, const char* source)
 {
     GLuint shader = glCreateShader(type);
@@ -73,9 +75,10 @@ GLuint Shader::Compile(GLenum type, const char* source)
     return shader;
 }
 
+// Builds the program: compile both stages, link them, then free the stages (the linked program keeps what it needs).
 bool Shader::Load(const char* vertexSource, const char* fragmentSource)
 {
-    Destroy();
+    Destroy(); // loading twice replaces the old program instead of leaking it
 
     const GLuint vs = Compile(GL_VERTEX_SHADER, vertexSource);
     const GLuint fs = Compile(GL_FRAGMENT_SHADER, fragmentSource);
@@ -112,6 +115,7 @@ bool Shader::Load(const char* vertexSource, const char* fragmentSource)
     return true;
 }
 
+// Frees the GPU program and forgets the cached uniform locations (they belong to that program only).
 void Shader::Destroy()
 {
     if (program != 0)
@@ -122,6 +126,7 @@ void Shader::Destroy()
     locations.clear();
 }
 
+// The context died with the program in it: just forget the handle, never call glDeleteProgram on it.
 void Shader::ContextLost()
 {
     program = 0;
@@ -132,6 +137,7 @@ void Shader::Use() const { glUseProgram(program); }
 
 bool Shader::IsValid() const { return program != 0; }
 
+// Asking GL for a uniform's location by name is slow, so each name is looked up once and remembered.
 GLint Shader::Location(const char* name)
 {
     const auto it = locations.find(name);

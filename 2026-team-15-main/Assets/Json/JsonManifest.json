@@ -10,7 +10,8 @@
 
   "CONFIG": {
     "Audio":      "Audio.json",
-    "Simulation": "Simulation.json"
+    "Simulation": "Simulation.json",
+    "AR":         "AR.json"
   },
 
   "SCENES": { "Main": "Scenes.json" },

@@ -34,6 +34,10 @@ namespace Core
     inline UI32 frameCount{};
 
     inline bool isPaused{ false };
+    // M2G05: true while the AR station is hidden (not placed yet, tracking lost, or the card covered). Game time (dt)
+    // stops so a graded session is not spoiled, and starts again on its own once tracking is back. Separate from
+    // isPaused (the player's Pause button), so neither one undoes the other.
+    inline bool isTrackingHeld{ false };
     //inline bool applicationRunning{ true };
 
     inline InputProcessing mInput;

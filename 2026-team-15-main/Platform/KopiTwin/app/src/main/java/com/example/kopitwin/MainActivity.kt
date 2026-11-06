@@ -41,6 +41,41 @@ class MainActivity : AppCompatActivity() {
     private external fun nativeArStop()
 
     private external fun nativeArDestroy()
+    private external fun nativeLoadMarkerConfig(): String
+    private external fun nativeSetMarkerImage(grayscale: ByteArray, width: Int, height: Int)
+
+    private var markerSent = false   // C++ keeps its copy until the session is configured: decode once, not on every resume
+
+    // Goal 5: the printed card that places the station. Which picture, its printed width and tilt mode are in
+    // Assets/Json/AR.json (read by C++). This only decodes the picture: ARCore (C++) does all the tracking.
+    // No card = place on a table as before.
+    private fun loadMarkerImage() {
+        if (markerSent) return
+        markerSent = true
+        val imagePath = nativeLoadMarkerConfig()
+        if (imagePath.isEmpty()) return
+        val markerAsset = imagePath.removePrefix("Assets/")   // the repo's Assets folder is the APK's assets root
+        val options = android.graphics.BitmapFactory.Options().apply { inScaled = false }
+        val bitmap = try {
+            assets.open(markerAsset).use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+        } catch (e: java.io.IOException) {
+            android.util.Log.e("kopitwin", "Marker card: cannot open $markerAsset ($e)")
+            null
+        }
+        if (bitmap == null) {
+            android.util.Log.e("kopitwin", "Marker card: $markerAsset did not decode, placing on tables only")
+            return
+        }
+        android.util.Log.i("kopitwin", "Marker card: decoded ${bitmap.width}x${bitmap.height}, sending to ARCore")
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val gray = ByteArray(pixels.size) { i ->
+            val p = pixels[i]
+            ((Color.red(p) * 299 + Color.green(p) * 587 + Color.blue(p) * 114) / 1000).toByte()
+        }
+        nativeSetMarkerImage(gray, bitmap.width, bitmap.height)
+        bitmap.recycle()
+    }
 
     private fun audioKey(id: Int) = glView.queueEvent { NativeCore.nativeAudioKey(id) }
 
@@ -68,6 +103,7 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
             return
         }
+        loadMarkerImage()   // before nativeArCreate: the card is added when the session is configured
         nativeArCreate()
     }
 
@@ -97,22 +133,16 @@ class MainActivity : AppCompatActivity() {
             textSize = 16f
             typeface = android.graphics.Typeface.MONOSPACE   // keeps the columns aligned
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.RED)
+            setBackgroundColor(Color.argb(90, 255, 0, 0))   // see-through red, like the stats box
             setPadding(8, 8, 8, 8)
             visibility = View.GONE
         }
-        val infoParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        )
-        //infoParams.leftMargin = 300
-        infoParams.topMargin = 450
 
         statsText = TextView(this).apply {
             textSize = 16f
             typeface = android.graphics.Typeface.MONOSPACE   // keeps the columns aligned
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.BLUE)           // semi-transparent black
+            setBackgroundColor(Color.argb(90, 0, 0, 255))   // see-through blue (alpha 90 of 255): the camera shows behind it
             setPadding(8, 8, 8, 8)
         }
         val statsParams = FrameLayout.LayoutParams(
@@ -201,8 +231,11 @@ class MainActivity : AppCompatActivity() {
         val layout = FrameLayout(this)
         layout.addView(glView)
         layout.addView(actionBar, actionParams)
-        layout.addView(statsText, statsParams)
-        layout.addView(infoText, infoParams)
+        // The blue stats box with the red touch box right under it: stacked, so they never overlap whatever the text length.
+        val debugColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        debugColumn.addView(statsText)
+        debugColumn.addView(infoText)
+        layout.addView(debugColumn, statsParams)
         layout.addView(pauseButton, buttonParams)
         layout.addView(buildAudioPanel(), audioSet)
 

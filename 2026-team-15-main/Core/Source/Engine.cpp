@@ -94,6 +94,7 @@ namespace
 
     // The camera of this frame. Update picks against it, so a tap hits what is on screen.
     bool gTracking = false;
+    bool gStationShown = false; // placed, tracking and the card not covered: draw it, run game time
     Matrix4x4 gView;
     Matrix4x4 gProjection;
     std::vector<Matrix4x4> planePoses;
@@ -144,6 +145,16 @@ namespace
         float view[16];
         float projection[16];
         gTracking = ArGetCameraMatrices(view, projection);
+
+        // The station is shown only when it can be trusted; while it is hidden, game time is held (M2G05).
+        gStationShown = gTracking && ArIsStationShown();
+        if (Core::isTrackingHeld == gStationShown)
+        {
+            Core::isTrackingHeld = !gStationShown;
+            LOGI("Session time %s", Core::isTrackingHeld ? "held: station hidden (tracking lost, card covered or not placed)"
+                                                         : "running again: station shown");
+        }
+
         if (!gTracking)
         {
             EquipmentScene::Get().SetMarker(0, Matrix4x4{});
@@ -183,6 +194,7 @@ namespace
         EquipmentScene::Get().SetPlanes(planePoses, planeSizes);
 #else
         gTracking = false; // no ARCore on desktop
+        gStationShown = false;
 #endif
     }
 
@@ -445,7 +457,7 @@ void Core::Update(UI64 nowT)
     /** Update time variables */
     Timer::Tick(nowT);
     unscaledDt = std::min(static_cast<F32>(Timer::GetFrameTime()), maxDt);
-    dt = timeScale * unscaledDt;
+    dt = isTrackingHeld ? 0.0f : timeScale * unscaledDt; // held = last frame's AR check (see ARTrackingState)
     frameCount = Timer::GetFrameCount();
     frameRate = static_cast<F32>(Timer::GetFrameRate());
 
@@ -479,8 +491,27 @@ void Core::Render()
     ArCameraDraw();
 #endif
 #if defined(KOPI_HAS_GL)
-    if (!gTracking) return;
-    EquipmentScene::Get().Draw(gView, gProjection);
+    static float loaderSeconds = 0.0f;
+    loaderSeconds += unscaledDt; // real time: the loader keeps spinning while the game clock is paused
+#if defined(__ANDROID__)
+    // The station only when it can be trusted (placed, tracking, card not covered); otherwise the loader in the middle.
+    bool const stationShown = gStationShown; // decided in ARTrackingState, which also holds game time
+    unsigned int depthTexture = 0;
+    float        depthUv[9];
+    bool const   hasDepth = ArGetDepthTexture(&depthTexture, depthUv);
+    Renderer::Get().SetDepth(hasDepth ? depthTexture : 0, hasDepth ? depthUv : nullptr); // hands hide the pieces
+#else
+    bool const stationShown = gStationShown;
+#endif
+    EquipmentScene::Get().SetStationShown(stationShown);
+    if (gTracking)
+    {
+        EquipmentScene::Get().Draw(gView, gProjection);
+    }
+    if (!stationShown)
+    {
+        EquipmentScene::Get().DrawLoader(loaderSeconds, viewportW, viewportH);
+    }
 #endif
 }
 
@@ -497,7 +528,8 @@ UI32 Core::GetOverlayText(char* buf, UI32 size)
 #else
     char const* placementStatus = "AR unavailable on desktop";
 #endif
-    UI32 n = std::snprintf(buf, size, "%s\nframe %u, dt = %.2f ms, fps = %.1f\n", placementStatus, frameCount, dt * 1000.0f, frameRate);
+    UI32 n = std::snprintf(buf, size, "%s\nframe %u, dt = %.2f ms, fps = %.1f%s\n", placementStatus, frameCount, dt * 1000.0f,
+                           frameRate, isTrackingHeld ? "  [TIME HELD]" : (isPaused ? "  [PAUSED]" : ""));
     if (n < size)
     {
         n += FormatEcs(buf + n, size - n);                 // new

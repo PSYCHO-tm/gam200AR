@@ -59,15 +59,19 @@ namespace
     }
 }
 
+// Reads the OBJ line by line. The file keeps positions, uvs and normals in three separate lists and a face corner
+// picks one from each ("v/vt/vn"); the GPU wants a single list of whole vertices instead. So every distinct
+// (position, uv, normal) triple becomes one Vertex, and 'lookup' makes sure a triple used by several faces is
+// stored only once.
 std::optional<MeshData> ParseObj(std::string const& text)
 {
-    std::vector<Vector3D> positions;
-    std::vector<Vector2D> uvs;
-    std::vector<Vector3D> normals;
+    std::vector<Vector3D> positions; // "v"  lines, in file order
+    std::vector<Vector2D> uvs;       // "vt" lines
+    std::vector<Vector3D> normals;   // "vn" lines
 
     MeshData                                    mesh;
-    std::vector<bool>                           needsNormal;
-    std::map<std::array<int, 3>, std::uint32_t> lookup;
+    std::vector<bool>                           needsNormal; // per vertex: the file gave no normal, make one below
+    std::map<std::array<int, 3>, std::uint32_t> lookup;      // (position, uv, normal) indices -> vertex index
 
     std::istringstream lines(text);
     std::string        line;
@@ -75,7 +79,7 @@ std::optional<MeshData> ParseObj(std::string const& text)
     {
         std::istringstream stream(line);
         std::string        tag;
-        stream >> tag;
+        stream >> tag; // the first word says what the line is; anything else (o, g, s, usemtl, #...) is skipped
 
         if (tag == "v")
         {
@@ -106,7 +110,7 @@ std::optional<MeshData> ParseObj(std::string const& text)
                 {
                     return std::nullopt;
                 }
-                std::array<int, 3> key{-1, -1, -1};
+                std::array<int, 3> key{-1, -1, -1}; // 0-based indices; -1 = this corner has no uv / normal
                 if (!ResolveIndex(raw[0], positions.size(), key[0]))
                 {
                     return std::nullopt;
@@ -121,7 +125,7 @@ std::optional<MeshData> ParseObj(std::string const& text)
                 }
 
                 auto found = lookup.find(key);
-                if (found == lookup.end())
+                if (found == lookup.end()) // first time this corner is seen: make a new Vertex for it
                 {
                     Vertex v;
                     v.pos = positions[static_cast<std::size_t>(key[0])];
@@ -141,8 +145,10 @@ std::optional<MeshData> ParseObj(std::string const& text)
             }
             if (face.size() < 3)
             {
-                return std::nullopt;
+                return std::nullopt; // fewer than 3 corners is not a surface
             }
+            // Fan triangulation: corners 0,1,2 then 0,2,3 then 0,3,4... Correct for the convex polygons
+            // that modelling tools export (quads, mostly).
             for (std::size_t i = 1; i + 1 < face.size(); ++i)
             {
                 mesh.indices.push_back(face[0]);
@@ -157,7 +163,8 @@ std::optional<MeshData> ParseObj(std::string const& text)
         return std::nullopt;
     }
 
-    // Smooth normals for vertices that had none.
+    // Smooth normals for vertices that had none: add up the (unnormalised) normal of every face touching the vertex,
+    // then normalise. Bigger faces count more because their cross product is longer, which is what looks right.
     std::vector<Vector3D> sums(mesh.vertices.size());
     for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3)
     {

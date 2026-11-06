@@ -222,3 +222,59 @@ Java_com_example_kopitwin_NativeCore_nativeAudioPause(JNIEnv*, jobject)  { Core:
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_kopitwin_NativeCore_nativeAudioResume(JNIEnv*, jobject) { Core::audio.ResumeAll(); }
+
+// Marker card (M2G05): its settings come from the CONFIG file the JSON manifest names "AR" (Assets/Json/AR.json),
+// so the card picture, its printed width or its tilt mode change without touching code.
+// Returns the picture's repo-relative path for Kotlin to decode, or "" when there is no usable card.
+// Runs in onResume, before nativeInit, so it sets the embedded-text reader itself.
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_kopitwin_MainActivity_nativeLoadMarkerConfig(JNIEnv* env, jobject /*thiz*/)
+{
+    Ecs::SetTextReader(FindEmbeddedText);
+    std::string const jsonDir = "Assets/Json/";
+    std::string image;
+    try
+    {
+        auto const manifest = Ecs::DeserializePath(jsonDir + "JsonManifest.json");
+        if (!manifest || !manifest->contains("CONFIG") || !(*manifest)["CONFIG"].contains("AR"))
+        {
+            LOGE("Marker card: JsonManifest.json has no CONFIG \"AR\", placing on tables only");
+            return env->NewStringUTF("");
+        }
+        auto const ar = Ecs::DeserializePath(jsonDir + (*manifest)["CONFIG"]["AR"].get<std::string>());
+        if (!ar || !ar->contains("AR") || !(*ar)["AR"].contains("MarkerCard"))
+        {
+            LOGE("Marker card: AR.json has no AR.MarkerCard, placing on tables only");
+            return env->NewStringUTF("");
+        }
+        Ecs::Json const& card = (*ar)["AR"]["MarkerCard"];
+        float const widthMetres = card.value("WidthMetres", 0.0f);
+        if (widthMetres <= 0.0f)
+        {
+            LOGE("Marker card: AR.MarkerCard.WidthMetres must be above 0, placing on tables only");
+            return env->NewStringUTF("");
+        }
+        ArSetMarkerConfig(widthMetres, card.value("FollowTilt", false));
+        image = card.value("Image", std::string{});
+        LOGI("Marker card config: %s, %.3f m wide, follow tilt %d", image.c_str(), widthMetres,
+             card.value("FollowTilt", false) ? 1 : 0);
+    }
+    catch (std::exception const& e)
+    {
+        LOGE("Marker card: AR.json is malformed (%s), placing on tables only", e.what());
+        image.clear();
+    }
+    return env->NewStringUTF(image.c_str());
+}
+
+// Marker card (M2G05): Kotlin decodes the PNG, C++ keeps a copy until the AR session is configured.
+// Must be called after nativeLoadMarkerConfig and before nativeArCreate.
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_kopitwin_MainActivity_nativeSetMarkerImage(JNIEnv* env, jobject /*thiz*/, jbyteArray grayscale,
+                                                            jint width, jint height)
+{
+    jbyte* pixels = env->GetByteArrayElements(grayscale, nullptr);
+    if (pixels == nullptr) return;
+    ArSetMarkerImage(reinterpret_cast<const uint8_t*>(pixels), width, height);
+    env->ReleaseByteArrayElements(grayscale, pixels, JNI_ABORT); // read only: nothing to copy back
+}

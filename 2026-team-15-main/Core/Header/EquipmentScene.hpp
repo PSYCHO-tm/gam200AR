@@ -12,12 +12,20 @@
 // Everything runs on the GL thread, called from Core (Init / Update / Render), so nothing here needs a lock.
 //
 // There is exactly one EquipmentScene, reached through Get(). Nobody owns it.
+//
+// Data in: the pieces come from ECS entities that have MeshRef + Transform3D (Engine.cpp, BuildEquipmentLibrary), their
+// .obj meshes from the app (baked in by CMake). Placement in: the anchor pose from ARCore (Engine.cpp, ARTrackingState).
+// Out: a list of Renderer::MeshDraw items each frame (the Renderer does the GL work), and the selected piece for the
+// action buttons (Engine.cpp, GetActionsText).
+//
+// Spaces: a piece's mesh is in its own "local" space; Equipment.json places it relative to the anchor; the anchor pose
+// places that in the ARCore world. Row vectors, so local * localModel * anchorPose = world (Matrix.hpp).
 class EquipmentScene
 {
 public:
-    static EquipmentScene& Get();
+    static EquipmentScene& Get(); // the one scene (created the first time this is called)
 
-    EquipmentScene(EquipmentScene const&)            = delete;
+    EquipmentScene(EquipmentScene const&)            = delete; // one scene only: no copies
     EquipmentScene& operator=(EquipmentScene const&) = delete;
 
     // Once per GL context. Takes the equipment list built from the ECS entities, and reads the meshes that CMake baked
@@ -31,6 +39,13 @@ public:
 
     // Once per frame, after the camera picture. Does nothing until the equipment has been placed.
     void Draw(Matrix4x4 const& view, Matrix4x4 const& projection);
+
+    // Once per frame, last: the "looking for the card" loader, a ring of see-through dots spinning in the middle of the
+    // screen. Draw it whenever the station is not shown. 'seconds' keeps growing (it drives the spin).
+    void DrawLoader(float seconds, int viewportW, int viewportH);
+
+    // false = the station is hidden (tracking cannot be trusted, or the card is covered): nothing is drawn or picked.
+    void SetStationShown(bool shown) { stationShown = shown; }
 
     // Called every frame while ARCore tracks, with the anchor's current pose (ARCore keeps correcting it).
     // The first call places the pieces (before it nothing is drawn); later calls move them with the anchor.
@@ -50,24 +65,25 @@ public:
     std::optional<std::size_t> GetSelected() const { return selected; }
 
 private:
-    EquipmentScene() = default;
+    EquipmentScene() = default; // only Get() makes one
 
-    static MeshData MakeMarkerMesh(); // a small flat square, lying in the x-z plane
+    static MeshData MakeMarkerMesh(); // a small flat square, lying in the x-z plane (debug square, planes, loader dots)
 
     void RefreshModels(); // models[i] = localModels[i] * anchorPose
 
-    static char const* FindAsset(char const* path);
-    static Vector3D    ColorFor(std::size_t index);
+    static char const* FindAsset(char const* path); // an embedded file's text by repo path; nullptr on desktop / missing
+    static Vector3D    ColorFor(std::size_t index); // placeholder colour per piece until the data carries colours
 
-    EquipmentLibrary           library;
+    EquipmentLibrary           library;     // the pieces, sorted by id (from the ECS)
     std::vector<MeshData>      meshes;      // same order as library.items
     std::vector<Matrix4x4>     localModels; // local -> anchor-local (scale, yaw, position from the JSON), same order
     std::vector<Matrix4x4>     models;      // local -> ARCore world = localModels * anchorPose, same order
     Matrix4x4                  anchorPose;  // set by SetAnchorPose
-    std::optional<std::size_t> selected;
+    std::optional<std::size_t> selected;    // index into library.items of the tapped piece, if any
     std::vector<Matrix4x4>     planeModels; // each tracked plane as a scaled rectangle, local -> ARCore world
-    int                        markerState = 0;
-    Matrix4x4                  markerPose;
-    bool                       loaded = false;
-    bool                       placed = false;
+    int                        markerState = 0; // see SetMarker
+    Matrix4x4                  markerPose;      // where the debug square lies
+    bool                       loaded = false;  // Init succeeded: meshes read and handed to the Renderer
+    bool                       placed = false;  // an anchor pose has arrived at least once
+    bool                       stationShown = false; // see SetStationShown
 };

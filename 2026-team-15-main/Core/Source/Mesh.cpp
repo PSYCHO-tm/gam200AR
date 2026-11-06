@@ -25,6 +25,7 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept
     return *this;
 }
 
+// CPU MeshData -> GPU buffers. GL_STATIC_DRAW: uploaded once, drawn every frame, never changed.
 void Mesh::Upload(MeshData const& data)
 {
     static_assert(sizeof(data.indices[0]) == sizeof(std::uint32_t), "Draw() uses GL_UNSIGNED_INT");
@@ -61,16 +62,18 @@ void Mesh::Upload(MeshData const& data)
     indexCount = static_cast<GLsizei>(data.indices.size());
 }
 
+// One draw call for the whole mesh. The VAO brings back the buffers and layout recorded in Upload.
 void Mesh::Draw() const
 {
     if (vao == 0)
     {
-        return;
+        return; // never uploaded (or already destroyed): nothing to draw
     }
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
+// Frees the three GPU objects. Safe to call twice: zero handles are skipped.
 void Mesh::Destroy()
 {
     if (vao != 0)

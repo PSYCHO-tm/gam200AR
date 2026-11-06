@@ -1,0 +1,11 @@
+{
+  "AR": {
+
+    "MarkerCard": {
+      "Image":       "Assets/Markers/kopitiam_marker.png",
+      "WidthMetres": 0.215,
+      "FollowTilt":  false
+    }
+
+  }
+}

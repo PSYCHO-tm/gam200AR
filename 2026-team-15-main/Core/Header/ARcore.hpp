@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 /**
  * @brief   Checks that the phone supports ARCore and that it is installed.
@@ -11,6 +12,26 @@
  *          false (call again later).
  */
 bool ArInitialise(void *env, void *activity);
+
+/**
+ * @brief   Gives ARCore the printed card that places the station.
+ * @details Call before ArSessionCreate: the card is added when the session is
+ *          configured. Without a card, the station is placed on a table as before.
+ *          Once the card is seen it wins: it places the station, or moves a
+ *          table-placed station onto the card.
+ *          ArSetMarkerConfig must be called first, for the card's printed width.
+ * @param[in] grayscale    width * height bytes, one per pixel, rows top to bottom (copied).
+ * @param[in] width        The image width in pixels.
+ * @param[in] height       The image height in pixels.
+ */
+void ArSetMarkerImage(const uint8_t* grayscale, int width, int height);
+
+/**
+ * @brief   The printed card's settings, from Assets/Json/AR.json (CONFIG "AR" in the JSON manifest).
+ * @param[in] widthMetres  The printed card's real width in metres.
+ * @param[in] followTilt   true = the station tilts with the card, false = it always stands upright.
+ */
+void ArSetMarkerConfig(float widthMetres, bool followTilt);
 
 /**
  * @brief   Creates the ARCore session, its settings and the frame object.
@@ -103,6 +124,25 @@ bool ArGetCameraMatrices(float* view, float* projection);
  * @return  true if the matrix was written, otherwise false (nothing is written).
  */
 bool ArGetAnchorPose(float* matrix);
+
+/**
+ * @brief   Whether the station can be trusted on screen right now.
+ * @details false before it is placed, while the camera or the anchor is not tracking (the pieces would drift or fly
+ *          around), and while the card is mostly covered (a hand over it). Show the loader instead then.
+ *          Call after ArGetCameraMatrices.
+ * @return  true = draw the station, false = hide it and show the loader.
+ */
+bool ArIsStationShown();
+
+/**
+ * @brief   Gives this frame's depth picture, so the lit shader can hide the parts of a piece behind real things.
+ * @details The texture is GL_RG8: each pixel is 16-bit millimetres, low byte in red, high byte in green
+ *          (0 = unknown depth). Only valid on the drawing thread, for this frame.
+ * @param[out] texture      The GL texture handle.
+ * @param[out] uvTransform  9 floats, a column-major 3x3 matrix: (screen x, screen y, 1) in 0..1 -> depth picture 0..1.
+ * @return  false when there is no depth this frame (phone without depth, or not tracking): nothing is written.
+ */
+bool ArGetDepthTexture(unsigned int* texture, float* uvTransform);
 
 /**
  * @brief   Says in a few words what the plane placement is doing, for the on-screen text.
