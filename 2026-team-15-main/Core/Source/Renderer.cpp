@@ -80,7 +80,18 @@ void Renderer::SetDepth(unsigned int texture, float const* uvTransform)
     }
 }
 
-// Draws every item with the lit shader. Steps: upload if needed -> GL state (depth test, blending) -> depth picture
+// The program for a material's shader. Only Lit exists today; FreeType text adds its own case here.
+Shader& Renderer::ShaderFor(ShaderKind kind)
+{
+    switch (kind)
+    {
+    case ShaderKind::Lit:
+        return litShader;
+    }
+    return litShader; // unreachable with a valid ShaderKind; keeps every path returning a shader
+}
+
+// Draws every item with the shader its material names. Steps: upload if needed -> GL state (depth test, blending) -> depth picture
 // -> per item: matrices and colours as uniforms, one draw call -> put the GL state back the way it was found.
 void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& view, Matrix4x4 const& projection)
 {
@@ -98,7 +109,6 @@ void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& v
     glEnable(GL_DEPTH_TEST); // pieces hide each other correctly, whatever order they come in
     glEnable(GL_BLEND); // only draws with alpha below 1 are see-through; everything else is unchanged
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    litShader.Use();
 
     // The depth picture goes on texture unit 1 (unit 0 is left to the camera picture).
     bool const hasDepth = depthTexture != 0;
@@ -106,20 +116,37 @@ void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& v
     {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, depthTexture);
-        litShader.SetInt("uDepthTex", 1);
-        litShader.SetVec3("uDepthUvX", &depthUv[0]); // column 0
-        litShader.SetVec3("uDepthUvY", &depthUv[3]); // column 1
-        litShader.SetVec3("uDepthUvO", &depthUv[6]); // column 2: the bottom-left corner
     }
 
     // Row vectors, leftmost applies first: world -> view, then view -> clip.
     Matrix4x4 const viewProjection = view * projection;
 
+    Shader* current = nullptr; // the program in use; switched only when an item asks for a different one
     for (MeshDraw const& item : items)
     {
         if (item.meshIndex >= meshes.size())
         {
             continue; // stale index (meshes not set yet): skip it rather than read past the list
+        }
+
+        // Each item names its shader (the material's ShaderKind, from the data). Switching programs costs a little,
+        // so it only happens when the shader changes from one item to the next.
+        Shader& shader = ShaderFor(item.shader);
+        if (!shader.IsValid())
+        {
+            continue; // that shader failed to build (already logged)
+        }
+        if (&shader != current)
+        {
+            shader.Use();
+            current = &shader;
+            if (hasDepth)
+            {
+                shader.SetInt("uDepthTex", 1);
+                shader.SetVec3("uDepthUvX", &depthUv[0]); // column 0
+                shader.SetVec3("uDepthUvY", &depthUv[3]); // column 1
+                shader.SetVec3("uDepthUvO", &depthUv[6]); // column 2: the bottom-left corner
+            }
         }
 
         Matrix4x4 const mvp      = item.model * viewProjection; // local -> world -> view -> clip
@@ -128,13 +155,13 @@ void Renderer::DrawMeshes(std::vector<MeshDraw> const& items, Matrix4x4 const& v
 
         // m[4][4] row-major, read by GL as column-major (GL_FALSE = no transpose): that is exactly the
         // column-vector matrix the shader wants, so the first float is passed as it is.
-        litShader.SetMat4("uMvp", &mvp.m[0][0]);
-        litShader.SetMat4("uModel", &item.model.m[0][0]);
-        litShader.SetVec3("uColor", color);
-        litShader.SetVec3("uTint", tint);
-        litShader.SetFloat("uTintAmount", item.tintAmount);
-        litShader.SetFloat("uAlpha", item.alpha);
-        litShader.SetFloat("uUseDepth", (hasDepth && item.occludable) ? 1.0f : 0.0f);
+        shader.SetMat4("uMvp", &mvp.m[0][0]);
+        shader.SetMat4("uModel", &item.model.m[0][0]);
+        shader.SetVec3("uColor", color);
+        shader.SetVec3("uTint", tint);
+        shader.SetFloat("uTintAmount", item.tintAmount);
+        shader.SetFloat("uAlpha", item.alpha);
+        shader.SetFloat("uUseDepth", (hasDepth && item.occludable) ? 1.0f : 0.0f);
 
         meshes[item.meshIndex].Draw();
     }

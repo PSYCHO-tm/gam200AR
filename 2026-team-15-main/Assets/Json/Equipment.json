@@ -2,217 +2,55 @@
   "EQUIPMENT": {
     "Kettle": {
       "Components": {
-        "Name": {
-          "Value": "Kettle"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/kettle.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            -0.21,
-            0,
-            -0.02
-          ]
-        },
+        "Name":        { "Value": "Kettle" },
+        "MeshRef":     { "Path": "Assets/Models/kettle.obj", "Shader": "Lit", "Colour": [0.76, 0.78, 0.81] },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [-0.15, 0, 0] },
         "Props": {
           "Interactions": {
-            "pour_water": {
-              "Label": "Pour hot water",
-              "Ingredient": "water",
-              "Quantity": 220,
-              "Units": "g",
-              "Attributes": {
-                "State": "hot"
-              }
-            }
+            "pour_water": { "Label": "Pour hot water", "Ingredient": "water", "Quantity": 220, "Units": "g", "Attributes": { "State": "hot" } }
           },
-          "Visual": {
-            "Colour": [
-              0.76,
-              0.78,
-              0.81
-            ]
-          },
+          "Visual": {},
           "Audio": {}
         }
       }
     },
+
     "SockFilter": {
       "Components": {
-        "Name": {
-          "Value": "Sock Filter"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/sock_filter.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            0.16,
-            0,
-            -0.07
-          ]
-        },
+        "Name":        { "Value": "Sock Filter" },
+        "MeshRef":     { "Path": "Assets/Models/sock_filter.obj", "Shader": "Lit", "Colour": [0.62, 0.45, 0.28] },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [0.15, 0, 0] },
         "Props": {
           "Interactions": {
-            "add_grounds": {
-              "Label": "Add coffee grounds",
-              "Ingredient": "coffee_beans",
-              "Quantity": 18,
-              "Units": "g",
-              "Attributes": {
-                "State": "ground"
-              }
-            },
-            "serve": {
-              "Label": "Serve",
-              "Quantity": 1,
-              "Units": "cup"
-            }
+            "add_grounds": { "Label": "Add coffee grounds", "Ingredient": "coffee_beans", "Quantity": 18, "Units": "g",  "Attributes": { "State": "ground" } },
+            "serve":       { "Label": "Serve", "Quantity": 1, "Units": "cup" }
           },
-          "Visual": {
-            "Colour": [
-              0.62,
-              0.45,
-              0.28
-            ]
-          },
+          "Visual": {},
           "Audio": {}
         }
       }
     },
+
     "CondensedMilkTin": {
       "Components": {
-        "Name": {
-          "Value": "Condensed Milk Tin"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/condensed_milk_tin.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            -0.1,
-            0,
-            0.1
-          ]
-        },
+        "Name":        { "Value": "Condensed Milk Tin" },
+        "MeshRef":     { "Path": "Assets/Models/condensed_milk_tin.obj", "Shader": "Lit", "Colour": [0.93, 0.88, 0.72] },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [0, 0, 0.12] },
         "Props": {
           "Interactions": {
-            "pour_condensed_milk": {
-              "Label": "Add condensed milk",
-              "Ingredient": "condensed_milk",
-              "Quantity": 2,
-              "Units": "tablespoon(s)",
-              "Attributes": {
-                "Sweetened": "Yes"
-              }
-            }
+            "pour_condensed_milk": { "Label": "Add condensed milk", "Ingredient": "condensed_milk", "Quantity": 2, "Units": "tablespoon(s)", "Attributes": { "Sweetened": "Yes" } }
           },
-          "Visual": {
-            "Colour": [
-              0.93,
-              0.88,
-              0.72
-            ]
-          },
+          "Visual": {},
           "Audio": {}
         }
       }
     },
+
     "Cup": {
       "Components": {
-        "Name": {
-          "Value": "Cup"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/cup.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            0.17,
-            0,
-            0.09
-          ]
-        },
-        "Props": {
-          "Interactions": {},
-          "Visual": {
-            "Colour": [
-              0.86,
-              0.9,
-              0.93
-            ],
-            "Alpha": 0.4
-          },
-          "Audio": {}
-        }
-      }
-    },
-    "CoffeeLiquid": {
-      "Components": {
-        "Name": {
-          "Value": "Coffee"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/coffee_liquid.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            0.8,
-            0.8,
-            0.8
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            0.14,
-            0.006,
-            0
-          ]
-        },
+        "Name":        { "Value": "Cup" },
+        "MeshRef":     { "Path": "Assets/Models/cup.obj", "Shader": "Lit", "Colour": [0.86, 0.90, 0.93] },
+        "Transform3D": { "scale": [1, 1, 1], "rotation": [0, 0, 0], "position": [0.14, 0, 0] },
         "Props": {
           "Interactions": {},
           "Visual": {},
@@ -220,192 +58,15 @@
         }
       }
     },
-    "KopiPot": {
+
+    "CoffeeLiquid": {
       "Components": {
-        "Name": {
-          "Value": "Kopi Pot"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/kopi_pot.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            0.02,
-            0,
-            -0.06
-          ]
-        },
+        "Name":        { "Value": "Coffee" },
+        "MeshRef":     { "Path": "Assets/Models/coffee_liquid.obj", "Shader": "Lit", "Colour": [0.30, 0.17, 0.08] },
+        "Transform3D": { "scale": [0.8, 0.8, 0.8], "rotation": [0, 0, 0], "position": [0.14, 0.006, 0] },
         "Props": {
           "Interactions": {},
-          "Visual": {
-            "Colour": [
-              0.7,
-              0.72,
-              0.76
-            ]
-          },
-          "Audio": {}
-        }
-      }
-    },
-    "CoffeeBag": {
-      "Components": {
-        "Name": {
-          "Value": "Coffee Powder"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/coffee_bag.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            -0.08,
-            0,
-            -0.15
-          ]
-        },
-        "Props": {
-          "Interactions": {},
-          "Visual": {
-            "Colour": [
-              0.6,
-              0.4,
-              0.22
-            ]
-          },
-          "Audio": {}
-        }
-      }
-    },
-    "SugarBowl": {
-      "Components": {
-        "Name": {
-          "Value": "Sugar Bowl"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/sugar_bowl.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            0.17,
-            0,
-            0.2
-          ]
-        },
-        "Props": {
-          "Interactions": {},
-          "Visual": {
-            "Colour": [
-              0.95,
-              0.95,
-              0.93
-            ]
-          },
-          "Audio": {}
-        }
-      }
-    },
-    "Spoon": {
-      "Components": {
-        "Name": {
-          "Value": "Stirring Spoon"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/spoon.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            -0.02,
-            0,
-            0.2
-          ]
-        },
-        "Props": {
-          "Interactions": {},
-          "Visual": {
-            "Colour": [
-              0.8,
-              0.82,
-              0.85
-            ]
-          },
-          "Audio": {}
-        }
-      }
-    },
-    "EvapMilkCan": {
-      "Components": {
-        "Name": {
-          "Value": "Evaporated Milk"
-        },
-        "MeshRef": {
-          "Path": "Assets/Models/evap_milk_can.obj"
-        },
-        "Transform3D": {
-          "scale": [
-            1,
-            1,
-            1
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "position": [
-            -0.2,
-            0,
-            0.12
-          ]
-        },
-        "Props": {
-          "Interactions": {},
-          "Visual": {
-            "Colour": [
-              0.3,
-              0.45,
-              0.75
-            ]
-          },
+          "Visual": {},
           "Audio": {}
         }
       }

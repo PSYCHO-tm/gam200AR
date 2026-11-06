@@ -7,6 +7,7 @@
 #include "Mesh.hpp"
 #include "Shader.hpp"
 #include "Vector.hpp"
+#include "objLoader.hpp" // ShaderKind: the Render-System gets "which shader" from ObjLoader's material box
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Renderer: the "how" of drawing 3D things.
@@ -34,6 +35,7 @@ public:
     struct MeshDraw
     {
         std::size_t meshIndex = 0;          // which mesh, by its position in the list given to SetMeshes
+        ShaderKind  shader = ShaderKind::Lit; // which program draws it (the material's shader, from ObjLoader)
         Matrix4x4   model;                  // local -> world (identity by default)
         Vector3D    color{1.0f, 1.0f, 1.0f};
         Vector3D    tint{0.0f, 0.0f, 0.0f};
@@ -74,6 +76,7 @@ private:
 
     void FreeMeshes();   // deletes every GPU mesh (needs a live context)
     void UploadMeshes(); // GPU copy rebuilt from meshData; runs lazily inside DrawMeshes when needsUpload is set
+    Shader& ShaderFor(ShaderKind kind); // the program behind a material's shader name
 
     Shader                litShader;   // lit.vert + lit.frag: one colour per mesh, simple sun light, optional depth hiding
     std::vector<MeshData> meshData;    // CPU copy: the source for every (re)upload

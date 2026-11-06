@@ -321,7 +321,10 @@ namespace
             EquipmentDef def;
             def.id       = world.coordinator.HasComponent<DefRef>(e) ? world.coordinator.GetComponent<DefRef>(e).Id : std::to_string(e);
             def.name     = world.coordinator.HasComponent<Name>(e) ? world.coordinator.GetComponent<Name>(e).Value : def.id;
-            def.meshPath = world.coordinator.GetComponent<MeshRef>(e).Path;
+            MeshRef const& mesh = world.coordinator.GetComponent<MeshRef>(e);
+            def.meshPath   = mesh.Path;
+            def.shaderName = mesh.Shader; // how it is drawn comes from the data too (Render-System box, see objLoader.hpp)
+            def.colour     = mesh.Colour;
 
             Transform3D const& t = world.coordinator.GetComponent<Transform3D>(e);
             def.position = t.position;
@@ -331,23 +334,6 @@ namespace
             if (world.coordinator.HasComponent<Props>(e))
             {
                 auto const& values = world.coordinator.GetComponent<Props>(e).Values;
-
-                // Sandbox: the piece's colour from Props.Visual.Colour ([r, g, b], 0..1), instead of the palette.
-                auto const visual = values.find("Visual");
-                if (visual != values.end() && visual->second.is_object() && visual->second.contains("Colour"))
-                {
-                    auto const& c = visual->second["Colour"];
-                    if (c.is_array() && c.size() == 3)
-                    {
-                        def.colour    = Vector3D{c[0].get<float>(), c[1].get<float>(), c[2].get<float>()};
-                        def.hasColour = true;
-                    }
-                }
-                if (visual != values.end() && visual->second.is_object())
-                {
-                    def.alpha = visual->second.value("Alpha", 1.0f);
-                }
-
                 auto        found  = values.find("Interactions");
                 if (found != values.end() && found->second.is_object())
                 {
@@ -407,10 +393,7 @@ namespace
             if (world.runner->StartNext(errs)) LOGI("Scenario started: %s", world.runner->Current().c_str());
             else for (auto const& e : errs) LOGE("Scenario error: %s", e.c_str());
         }
-        {
-            PROFILE_SCOPE("AR total");
-            ARTrackingState();
-        }
+        ARTrackingState();
 #if defined(KOPI_HAS_GL)
         EquipmentScene::Get().Update(dt, Core::mInput.GetSnapshot(), gTracking, gView, gProjection, Core::viewportW,
                                      Core::viewportH);
@@ -446,71 +429,9 @@ bool Core::Init()
     #if defined(KOPI_HAS_GL)
         Renderer::Get().Init();          // forgets old GPU handles, then builds the lit shader
         EquipmentScene::Get().Init(BuildEquipmentLibrary());
-
-        // Sandbox: Mabel's guided lesson (Assets/Json/Lesson.json). Once per app run, not per GL context, so a
-        // trip to the background does not restart the lesson.
-        static bool lessonLoaded = false;
-        if (!lessonLoaded)
-        {
-            lessonLoaded = true;
-            try
-            {
-                auto const file = Ecs::DeserializePath(KOPI_JSON_DIR "Lesson.json");
-                if (file && file->contains("LESSON"))
-                {
-                    Ecs::Json const& lesson = (*file)["LESSON"];
-                    std::vector<EquipmentScene::LessonStep> steps;
-                    auto const vec3 = [](Ecs::Json const& j, char const* key, Vector3D fallback) {
-                        if (!j.contains(key) || !j[key].is_array() || j[key].size() != 3) return fallback;
-                        return Vector3D{j[key][0].get<float>(), j[key][1].get<float>(), j[key][2].get<float>()};
-                    };
-                    for (Ecs::Json const& s : lesson.value("Steps", Ecs::Json::array()))
-                    {
-                        EquipmentScene::LessonStep step;
-                        step.section = s.value("Section", std::string{});
-                        step.title   = s.value("Title", std::string{});
-                        step.hint    = s.value("Hint", std::string{});
-                        step.target  = s.value("Target", std::string{});
-                        if (s.contains("Animation") && s["Animation"].is_object())
-                        {
-                            Ecs::Json const& a     = s["Animation"];
-                            step.hasAnimation      = true;
-                            step.animation.type    = a.value("Type", std::string{});
-                            step.animation.piece   = a.value("Piece", std::string{});
-                            step.animation.into    = a.value("Into", std::string{});
-                            step.animation.colour  = vec3(a, "Colour", step.animation.colour);
-                            step.animation.level   = a.value("Level", step.animation.level);
-                            step.animation.tilt    = a.value("Tilt", step.animation.tilt);
-                            step.animation.seconds = a.value("Seconds", step.animation.seconds);
-                            step.animation.to      = vec3(a, "To", step.animation.to);
-                        }
-                        steps.push_back(std::move(step));
-                    }
-                    EquipmentScene::Get().LoadLesson(lesson.value("Name", std::string{"Lesson"}),
-                                                     lesson.value("Mode", std::string{"GUIDED"}), std::move(steps));
-                }
-                else
-                {
-                    LOGE("Lesson.json missing or has no LESSON: no guided lesson");
-                }
-            }
-            catch (std::exception const& e)
-            {
-                LOGE("Lesson.json is malformed (%s): no guided lesson", e.what());
-            }
-        }
     #endif
 
     return ok;
-}
-
-std::string Core::GetLessonState()
-{
-#if defined(KOPI_HAS_GL)
-    return EquipmentScene::Get().LessonState();
-#else
-    return "scan";
-#endif
 }
 
 void Core::Start()
@@ -569,14 +490,12 @@ void Core::Exit() {
 }
 void Core::Render()
 {
-    PROFILE_SCOPE("Render");
 #if defined(__ANDROID__)
     ArCameraDraw();
 #endif
 #if defined(KOPI_HAS_GL)
     static float loaderSeconds = 0.0f;
     loaderSeconds += unscaledDt; // real time: the loader keeps spinning while the game clock is paused
-    EquipmentScene::Get().SetClock(loaderSeconds); // same real-time clock for the lesson arrow's bob
 #if defined(__ANDROID__)
     // The station only when it can be trusted (placed, tracking, card not covered); otherwise the loader in the middle.
     bool const stationShown = gStationShown; // decided in ARTrackingState, which also holds game time
@@ -607,7 +526,6 @@ void Core::OnResume()
 
 UI32 Core::GetOverlayText(char* buf, UI32 size)
 {
-    PROFILE_SCOPE("Overlay text");
 #if defined(__ANDROID__)
     char const* placementStatus = ArGetPlacementStatus();
 #else

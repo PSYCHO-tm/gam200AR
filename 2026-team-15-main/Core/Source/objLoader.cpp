@@ -1,4 +1,4 @@
-#include "ObjLoader.hpp"
+#include "objLoader.hpp" // exact case: Linux (and the Jenkins build) treats ObjLoader.hpp as a different, missing file
 
 #include <array>
 #include <cstdint>
@@ -190,4 +190,26 @@ std::optional<MeshData> ParseObj(std::string const& text)
         }
     }
     return mesh;
+}
+std::optional<ShaderKind> ShaderKindFromName(std::string const& name)
+{
+    if (name == "Lit")
+    {
+        return ShaderKind::Lit;
+    }
+    return std::nullopt; // add new shaders here, next to their ShaderKind
+}
+
+std::optional<RenderMaterial> MakeMaterial(std::string const& shaderName, Vector3D const& colour)
+{
+    std::optional<ShaderKind> const shader = ShaderKindFromName(shaderName);
+    if (!shader)
+    {
+        return std::nullopt;
+    }
+    auto const clamp01 = [](float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); };
+    RenderMaterial material;
+    material.shader = *shader;
+    material.colour = Vector3D{clamp01(colour.x), clamp01(colour.y), clamp01(colour.z)};
+    return material;
 }

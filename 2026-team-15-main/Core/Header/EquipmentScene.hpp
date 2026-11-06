@@ -1,14 +1,13 @@
 #pragma once
 #include <cstddef>
 #include <optional>
-#include <string>
 #include <vector>
 
 #include "Geometry.hpp"
 #include "Input.hpp"
 #include "Matrix.hpp"
-#include "EquipmentDef.hpp"
-#include "Renderer.hpp"
+#include "equipmentDef.hpp" // exact case, for Linux builds
+#include "objLoader.hpp" // RenderMaterial
 
 // The equipment you see in AR: loads it, keeps it still in the room, selects it when you tap it, and draws it.
 // Everything runs on the GL thread, called from Core (Init / Update / Render), so nothing here needs a lock.
@@ -66,102 +65,6 @@ public:
     EquipmentLibrary const&    GetLibrary() const { return library; }
     std::optional<std::size_t> GetSelected() const { return selected; }
 
-    // ---- Guided lesson (sandbox, Mabel's Figma flow) -------------------------------------------------------------
-    // What a step shows after the right tap (Lesson.json "Animation"). Kinds:
-    //   Pour     - 'piece' moves over 'into', tips by 'tilt' degrees, a stream runs, 'into' fills to 'level' in 'colour'
-    //   Dip      - 'piece' lowers into 'into', brews ('into' turns 'colour'), lifts out and drips, goes back
-    //   Sprinkle - 'piece' moves over 'into' and tips; grains in 'colour' fall with gravity and land in it
-    //   Place    - 'piece' moves (with a little arc) to 'to' and stays there
-    //   Stir     - 'piece' (the spoon) stands up in 'into' and circles; 'into' turns 'colour'
-    struct LessonAnimation
-    {
-        std::string type;
-        std::string piece;            // the piece that moves; empty = the step's target
-        std::string into;             // the piece acted on
-        Vector3D    colour{0.5f, 0.3f, 0.1f};
-        float       level   = 0.0f;   // Pour: how full 'into' ends up (0..1 of its inside height)
-        float       tilt    = 60.0f;  // degrees the piece tips
-        float       seconds = 3.0f;
-        Vector3D    to{0.0f, 0.0f, 0.0f}; // Place: the new spot, anchor-local metres
-    };
-
-    // One step of the lesson: what to do, the hint under it, and which piece (Equipment.json key) to tap.
-    struct LessonStep
-    {
-        std::string     section; // "BREW" / "PREPARE"
-        std::string     title;   // "Add coffee powder"
-        std::string     hint;    // the longer help line
-        std::string     target;  // equipment id, e.g. "SockFilter"
-        bool            hasAnimation = false;
-        LessonAnimation animation;
-    };
-
-    // The lesson from Assets/Json/Lesson.json (read in Engine.cpp). Starts at step 1.
-    void LoadLesson(std::string name, std::string mode, std::vector<LessonStep> steps);
-
-    // Real time in seconds (keeps running while game time is held): drives the arrow's bob.
-    void SetClock(float seconds) { clock = seconds; }
-
-    // Everything the Kotlin HUD needs, as tab-separated fields:
-    // state (scan / step / done), step number (1-based), step count, section, title, hint, lesson name, mode,
-    // and 1 if the last tap hit the wrong piece in the last 1.5 s (else 0).
-    std::string LessonState() const;
-
-private:
-    static MeshData MakeArrowMesh(); // a small arrow pointing down (-y), tip at the origin
-
-    std::optional<std::size_t> LessonTargetIndex() const; // the current step's piece in library.items, if it exists
-    std::optional<std::size_t> PieceIndex(std::string const& id) const;
-
-    // ---- Animation (sandbox) -------------------------------------------------------------------------------------
-    static MeshData MakeCylinderMesh(); // radius 1, from y = 0 to y = 1, closed: liquids and the pour stream
-    static MeshData MakeGrainMesh();    // a tiny cube, 1 unit wide: powder and sugar grains, drips
-
-    void UpdateAnimation(float dt);     // advances the playing step animation, its particles and liquids
-    void FinishAnimation();             // puts everything at rest and moves the lesson on
-    void DrawLiquidsAndEffects();       // adds liquids, the stream and the grains to 'draws'
-
-    // A container's inside, from its mesh box: radius, floor height and usable height (piece-local metres).
-    void ContainerInside(std::size_t i, float& radius, float& floor, float& height) const;
-
-    struct Liquid
-    {
-        float    level = 0.0f; // 0..1 of the inside height
-        Vector3D colour{0.75f, 0.85f, 0.95f};
-    };
-    struct Grain
-    {
-        Vector3D position;  // world metres
-        Vector3D velocity;  // metres per second
-        Vector3D colour;
-        float    floorY;    // world height where it lands and disappears
-    };
-
-    std::vector<Vector3D> basePositions; // each piece's resting spot (anchor-local); Place changes it
-    std::vector<Vector3D> animOffset;    // this frame's extra move (anchor-local)
-    std::vector<float>    animTilt;      // degrees tipped (its local +x side goes down)
-    std::vector<float>    animTurn;      // degrees turned about y so its +x side faces where it pours
-    std::vector<Liquid>   liquids;       // per piece; only containers ever get a level
-    std::vector<Grain>    grains;
-    bool                  animating = false;
-    float                 animTime  = 0.0f; // seconds into the playing animation (game time: holds while hidden)
-    bool                  streamOn  = false;
-    Vector3D              streamTop;
-    Vector3D              streamBottom;
-    Vector3D              streamColour;
-    float                 grainSpawn = 0.0f; // fractional grains owed to the spawner
-    Liquid                animStartInto;     // the 'into' liquid when the animation started
-    Liquid                animStartPiece;    // the moving piece's liquid when it started (a pot that pours)
-
-    std::string             lessonName;
-    std::string             lessonMode;
-    std::vector<LessonStep> lessonSteps;
-    std::size_t             lessonStep = 0;     // 0-based; == size() when the lesson is done
-    float                   clock = 0.0f;
-    float                   wrongTapAt = -100.0f; // clock time of the last tap on the wrong piece
-
-public:
-
 private:
     EquipmentScene() = default; // only Get() makes one
 
@@ -170,10 +73,10 @@ private:
     void RefreshModels(); // models[i] = localModels[i] * anchorPose
 
     static char const* FindAsset(char const* path); // an embedded file's text by repo path; nullptr on desktop / missing
-    static Vector3D    ColorFor(std::size_t index); // placeholder colour per piece until the data carries colours
 
-    EquipmentLibrary           library;     // the pieces, sorted by id (from the ECS)
-    std::vector<MeshData>      meshes;      // same order as library.items
+    EquipmentLibrary            library;    // the pieces, sorted by id (from the ECS)
+    std::vector<MeshData>       meshes;     // same order as library.items
+    std::vector<RenderMaterial> materials;  // same order: each piece's {Shader, Colour}, from ObjLoader::MakeMaterial
     std::vector<Matrix4x4>     localModels; // local -> anchor-local (scale, yaw, position from the JSON), same order
     std::vector<Matrix4x4>     models;      // local -> ARCore world = localModels * anchorPose, same order
     Matrix4x4                  anchorPose;  // set by SetAnchorPose
@@ -184,5 +87,4 @@ private:
     bool                       loaded = false;  // Init succeeded: meshes read and handed to the Renderer
     bool                       placed = false;  // an anchor pose has arrived at least once
     bool                       stationShown = false; // see SetStationShown
-    std::vector<Renderer::MeshDraw> draws;           // sandbox optimisation: this frame's draw list, reused (no new heap memory each frame)
 };

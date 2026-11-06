@@ -5,6 +5,7 @@ get_sdl3()
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "Source/*.cpp")
 list(FILTER CORE_SOURCES EXCLUDE REGEX "/test\\.cpp$")     #  exclude placeholder test file
 list(FILTER CORE_SOURCES EXCLUDE REGEX "/ARcore\\.cpp$")   #  Android-only, exclude from build test
+list(FILTER CORE_SOURCES EXCLUDE REGEX "/AR/")              #  AR modules (Core/Source/AR): Android-only too
 if(NOT WIN32)   # Linux/WSL console build has no OpenGL (GlApi.hpp), so leave the GPU sources out
     list(FILTER CORE_SOURCES EXCLUDE REGEX "/(Mesh|Shader|Renderer|EquipmentScene)\\.cpp$")
 endif()

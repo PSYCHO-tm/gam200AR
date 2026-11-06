@@ -24,14 +24,13 @@ struct EquipmentDef
     std::string                 id; // key in the JSON, e.g. "Kettle"
     std::string                 name;
     std::string                 meshPath; // relative to the repo root, e.g. "Assets/Models/kettle.obj"
+    std::string                 shaderName = "Lit";         // MeshRef.Shader: which shader draws it
+    Vector3D                    colour{0.8f, 0.8f, 0.8f};   // MeshRef.Colour: its base colour, each 0..1
     Vector3D                    position{0.0f, 0.0f, 0.0f}; // anchor-local meters
     float                       yawDeg = 0.0f;
     float                       scale  = 1.0f;
     std::vector<InteractionDef> interactions;
     Collider                    localBounds; // the mesh's box, filled in by whoever loads the mesh
-    Vector3D                    colour{0.8f, 0.8f, 0.8f}; // sandbox: Props.Visual.Colour from Equipment.json
-    bool                        hasColour = false;        // false = use the placeholder palette
-    float                       alpha = 1.0f;             // sandbox: Props.Visual.Alpha, below 1 = see-through (glass)
 };
 
 class EquipmentLibrary

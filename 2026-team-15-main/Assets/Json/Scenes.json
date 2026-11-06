@@ -1,58 +1,36 @@
-{
+{  
   "schema_version": 1,
   "instances": [
     {
       "kind": "DRINKS",
       "def": "Kopi"
     },
+
     {
       "kind": "DRINKS",
       "def": "Kopi",
-      "overrides": {
-        "Temp": {
-          "Status": "Iced"
-        }
-      }
+      "overrides": { "Temp": { "Status": "Iced"}}
     },
+    
     {
       "kind": "INGREDIENTS",
       "def": "water"
     },
-    {
-      "kind": "EQUIPMENT",
-      "def": "Kettle"
+
+    { 
+	"kind": "EQUIPMENT", 
+	"def": "Kettle" 
     },
-    {
-      "kind": "EQUIPMENT",
-      "def": "KopiPot"
+
+    { 
+	"kind": "EQUIPMENT", 
+	"def": "SockFilter" 
     },
-    {
-      "kind": "EQUIPMENT",
-      "def": "SockFilter"
-    },
-    {
-      "kind": "EQUIPMENT",
-      "def": "CoffeeBag"
-    },
-    {
-      "kind": "EQUIPMENT",
-      "def": "Cup"
-    },
-    {
-      "kind": "EQUIPMENT",
-      "def": "CondensedMilkTin"
-    },
-    {
-      "kind": "EQUIPMENT",
-      "def": "SugarBowl"
-    },
-    {
-      "kind": "EQUIPMENT",
-      "def": "Spoon"
-    },
-    {
-      "kind": "EQUIPMENT",
-      "def": "EvapMilkCan"
+
+    { 
+	"kind": "EQUIPMENT", 
+	"def": "CondensedMilkTin" 
     }
   ]
+  
 }

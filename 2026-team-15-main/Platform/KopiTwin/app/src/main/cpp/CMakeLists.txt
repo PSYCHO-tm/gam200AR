@@ -50,15 +50,7 @@ embed_assets(${GEN_DIR}/EmbeddedAssets.hpp
         Assets/Models/sock_filter.obj
         Assets/Models/condensed_milk_tin.obj
         Assets/Models/cup.obj
-        Assets/Models/coffee_liquid.obj
-        Assets/Models/kopi_pot.obj
-        Assets/Models/coffee_bag.obj
-        Assets/Models/sugar_bowl.obj
-        Assets/Models/spoon.obj
-        Assets/Models/evap_milk_can.obj)
-
-# Sandbox: scoped profiler on for the phone build too (desktop CI already has it), to measure each system.
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE PROFILER_ENABLED)
+        Assets/Models/coffee_liquid.obj)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         ${CORE_INCLUDE_DIRS}

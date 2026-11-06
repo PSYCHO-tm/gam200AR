@@ -3,7 +3,6 @@
 
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 // One linked GPU program (vertex + fragment shader). Uniform locations are looked up once and cached.
 // The shader text comes in as strings: CMake turns Assets/Shader/*.vert|frag into lit_vert.hpp / lit_frag.hpp, so the
@@ -39,12 +38,4 @@ private:
 
     GLuint                                 program{0};       // 0 = not loaded
     std::unordered_map<std::string, GLint> locations{};      // uniform name -> location (-1 kept too, so it logs once)
-    // Sandbox optimisation: the names passed in are string literals, so the same pointer comes back every frame.
-    // A tiny pointer-keyed cache in front of the map skips building a std::string (a heap allocation) per uniform.
-    struct FastLocation
-    {
-        const char* name;
-        GLint       location;
-    };
-    std::vector<FastLocation> fastLocations{};
 };

@@ -1,8 +1,6 @@
 #include "EquipmentScene.hpp"
 
-#include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <cstring>
 #include <optional>
 #include <string>
@@ -12,42 +10,10 @@
 #endif
 #include "Raycast.hpp"
 #include "Renderer.hpp"
-#include "ObjLoader.hpp"
+#include "objLoader.hpp" // exact case, for Linux builds
 #include "PlatformLog.hpp"
 
 // The one scene. A function-local static: built on first use.
-namespace
-{
-    // Moller-Trumbore ray/triangle test: true if the ray hits triangle abc in front of its origin, with 'distance'
-    // set to how far along the (unit) direction the hit is. Works for both windings (no back-face rejection).
-    bool RayHitsTriangle(Raycast const& ray, Vector3D const& a, Vector3D const& b, Vector3D const& c, float& distance)
-    {
-        Vector3D const edge1 = b - a;
-        Vector3D const edge2 = c - a;
-        Vector3D const p     = ray.direction.CrossProduct(edge2);
-        float const    det   = edge1.DotProduct(p);
-        if (std::fabs(det) < 1e-12f)
-        {
-            return false; // the ray runs along the triangle's plane
-        }
-        float const    inverse = 1.0f / det;
-        Vector3D const s       = ray.origin - a;
-        float const    u       = s.DotProduct(p) * inverse;
-        if (u < 0.0f || u > 1.0f)
-        {
-            return false;
-        }
-        Vector3D const q = s.CrossProduct(edge1);
-        float const    v = ray.direction.DotProduct(q) * inverse;
-        if (v < 0.0f || u + v > 1.0f)
-        {
-            return false;
-        }
-        distance = edge2.DotProduct(q) * inverse;
-        return distance > 0.0f;
-    }
-}
-
 EquipmentScene& EquipmentScene::Get()
 {
     static EquipmentScene instance;
@@ -70,14 +36,6 @@ char const* EquipmentScene::FindAsset(char const* path)
     (void)path; // desktop has no embedded assets
 #endif
     return nullptr;
-}
-
-// Equipment has no colour in the data yet, so each piece gets one from a small palette.
-Vector3D EquipmentScene::ColorFor(std::size_t index)
-{
-    static Vector3D const palette[3] = {Vector3D{0.92f, 0.88f, 0.70f}, Vector3D{0.70f, 0.72f, 0.78f},
-                                        Vector3D{0.60f, 0.40f, 0.24f}};
-    return palette[index % 3];
 }
 
 // The debug square: 12 cm wide, lying flat just above the plane (+y is the plane's normal).
@@ -110,9 +68,20 @@ bool EquipmentScene::Init(EquipmentLibrary loadedLibrary)
         return false;
     }
 
-    std::vector<MeshData> loadedMeshes;
+    // The Render-System asks ObjLoader for both halves of each piece: its mesh (ParseObj) and how to draw it
+    // (MakeMaterial: the {Shader, Colour} box from its MeshRef).
+    std::vector<MeshData>       loadedMeshes;
+    std::vector<RenderMaterial> loadedMaterials;
     for (EquipmentDef& def : loadedLibrary.items)
     {
+        std::optional<RenderMaterial> const material = MakeMaterial(def.shaderName, def.colour);
+        if (!material)
+        {
+            LOGE("Equipment '%s': unknown shader '%s' in its MeshRef", def.id.c_str(), def.shaderName.c_str());
+            return false;
+        }
+        loadedMaterials.push_back(*material);
+
         char const* text = FindAsset(def.meshPath.c_str());
         if (text == nullptr)
         {
@@ -134,7 +103,8 @@ bool EquipmentScene::Init(EquipmentLibrary loadedLibrary)
         loadedMeshes.push_back(std::move(*mesh));
     }
 
-    library = std::move(loadedLibrary);
+    library   = std::move(loadedLibrary);
+    materials = std::move(loadedMaterials);
     localModels.clear();
     for (EquipmentDef const& def : library.items)
     {
@@ -142,21 +112,7 @@ bool EquipmentScene::Init(EquipmentLibrary loadedLibrary)
         localModels.push_back(
             Matrix4x4::SRT(Vector3D{def.scale, def.scale, def.scale}, Vector3D{0.0f, def.yawDeg, 0.0f}, def.position));
     }
-    loadedMeshes.push_back(MakeMarkerMesh()); // index library.items.size()
-    loadedMeshes.push_back(MakeArrowMesh());  // index library.items.size() + 1: the lesson's pointer
-    loadedMeshes.push_back(MakeCylinderMesh()); // index + 2: liquids and the pour stream
-    loadedMeshes.push_back(MakeGrainMesh());    // index + 3: powder, sugar and drips
-
-    // Animation state: every piece starts at its JSON spot, upright, empty.
-    basePositions.clear();
-    for (EquipmentDef const& def : library.items)
-    {
-        basePositions.push_back(def.position);
-    }
-    animOffset.assign(library.items.size(), Vector3D{0.0f, 0.0f, 0.0f});
-    animTilt.assign(library.items.size(), 0.0f);
-    animTurn.assign(library.items.size(), 0.0f);
-    liquids.assign(library.items.size(), Liquid{});
+    loadedMeshes.push_back(MakeMarkerMesh()); // always last: its index is library.items.size()
     meshes = std::move(loadedMeshes);
     Renderer::Get().SetMeshes(meshes);
     loaded = true;
@@ -166,7 +122,7 @@ bool EquipmentScene::Init(EquipmentLibrary loadedLibrary)
 
 // Tap picking: turn the tap into a ray through the camera (Raycast.hpp), test it against every piece's box in world
 // space (Collider.hpp), and select the nearest hit. A tap on empty space clears the selection.
-void EquipmentScene::Update(float dt, InputSnapshot const& input, bool tracking, Matrix4x4 const& view,
+void EquipmentScene::Update(float /*dt*/, InputSnapshot const& input, bool tracking, Matrix4x4 const& view,
                             Matrix4x4 const& projection, int viewportW, int viewportH)
 {
     if (!loaded || !tracking)
@@ -179,80 +135,27 @@ void EquipmentScene::Update(float dt, InputSnapshot const& input, bool tracking,
         return; // still scanning, or hidden: the pieces can be picked only while they are on screen
     }
 
-    // Game time (dt is 0 while held), so an animation freezes with the session timer when the station is hidden.
-    UpdateAnimation(dt);
-    RefreshModels();
-
-    if (input.Tapped && !animating) // taps wait until the current step's animation has played
+    if (input.Tapped)
     {
         Raycast const ray = ScreenPointToRay(input.TapX, input.TapY, viewportW, viewportH, view, projection);
 
-        // Sandbox: precise picking. The box test alone picked the kettle when the cup was tapped, because the kettle's
-        // box (spout and handle included) covered the cup on screen. So the box is now only a quick first check, and
-        // the piece really hit is the one whose actual TRIANGLES the ray reaches first. Taps are rare, so testing a
-        // few thousand triangles per tap costs far less than a millisecond.
+        // Nearest piece whose world box the ray enters (Collider does the box test, Raycast made the ray).
         std::optional<std::size_t> nearest;
         float                      nearestDistance = 0.0f;
-        for (std::size_t i = 0; i < library.items.size() && i < meshes.size(); ++i)
+        for (std::size_t i = 0; i < library.items.size(); ++i)
         {
-            float boxDistance = 0.0f;
-            if (!library.items[i].localBounds.Transformed(models[i]).IntersectsRay(ray, boxDistance))
+            float distance = 0.0f;
+            if (library.items[i].localBounds.Transformed(models[i]).IntersectsRay(ray, distance) &&
+                (!nearest || distance < nearestDistance))
             {
-                continue; // misses the box: cannot hit the shape inside it
-            }
-            if (nearest && boxDistance > nearestDistance)
-            {
-                continue; // the box starts further away than a surface already hit
-            }
-            MeshData const& mesh = meshes[i];
-            for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3)
-            {
-                Vector3D const a = models[i].TransformPoint(mesh.vertices[mesh.indices[t]].pos);
-                Vector3D const b = models[i].TransformPoint(mesh.vertices[mesh.indices[t + 1]].pos);
-                Vector3D const c = models[i].TransformPoint(mesh.vertices[mesh.indices[t + 2]].pos);
-                float          distance = 0.0f;
-                if (RayHitsTriangle(ray, a, b, c, distance) && (!nearest || distance < nearestDistance))
-                {
-                    nearest         = i;
-                    nearestDistance = distance;
-                }
+                nearest         = i;
+                nearestDistance = distance;
             }
         }
         selected = nearest;
         if (nearest)
         {
             LOGI("Tap (%.0f, %.0f) selected %s", input.TapX, input.TapY, library.items[*nearest].id.c_str());
-
-            // Guided lesson: the right piece moves to the next step, any other piece flashes "not that one".
-            if (lessonStep < lessonSteps.size())
-            {
-                if (library.items[*nearest].id == lessonSteps[lessonStep].target)
-                {
-                    wrongTapAt = -100.0f;
-                    if (lessonSteps[lessonStep].hasAnimation)
-                    {
-                        // Play the step's action first; FinishAnimation moves the lesson on when it is done.
-                        LessonAnimation const& anim = lessonSteps[lessonStep].animation;
-                        std::optional<std::size_t> const into  = PieceIndex(anim.into);
-                        std::optional<std::size_t> const piece = PieceIndex(anim.piece.empty() ? lessonSteps[lessonStep].target : anim.piece);
-                        animStartInto  = into ? liquids[*into] : Liquid{};
-                        animStartPiece = piece ? liquids[*piece] : Liquid{};
-                        animating      = true;
-                        animTime       = 0.0f;
-                        grainSpawn     = 0.0f;
-                        LOGI("Lesson: step %zu plays %s", lessonStep + 1, anim.type.c_str());
-                    }
-                    else
-                    {
-                        ++lessonStep;
-                        LOGI("Lesson: step %zu of %zu done", lessonStep, lessonSteps.size());
-                    }
-                }
-                else
-                {
-                    wrongTapAt = clock;
-                }
-            }
         }
         else
         {
@@ -292,19 +195,10 @@ void EquipmentScene::SetAnchorPose(Matrix4x4 const& pose)
 void EquipmentScene::RefreshModels()
 {
     models.clear();
-    models.reserve(library.items.size());
-    for (std::size_t i = 0; i < library.items.size(); ++i)
+    models.reserve(localModels.size());
+    for (Matrix4x4 const& local : localModels)
     {
-        EquipmentDef const& def = library.items[i];
-        // Row vectors, leftmost first: scale, its own yaw, then (sandbox animation) tip its +x side down and turn that
-        // side toward where it pours, then move to its spot (+ this frame's animation offset), then onto the anchor.
-        Matrix4x4 local = Matrix4x4::Scale(def.scale, def.scale, def.scale) * Matrix4x4::RotateY(def.yawDeg);
-        if (i < animTilt.size() && (animTilt[i] != 0.0f || animTurn[i] != 0.0f))
-        {
-            local = local * Matrix4x4::RotateZ(-animTilt[i]) * Matrix4x4::RotateY(animTurn[i]);
-        }
-        Vector3D const spot = (i < basePositions.size()) ? basePositions[i] + animOffset[i] : def.position;
-        models.push_back(local * Matrix4x4::Translate(spot.x, spot.y, spot.z) * anchorPose);
+        models.push_back(local * anchorPose); // local -> anchor-local -> ARCore world
     }
 }
 
@@ -318,7 +212,8 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
     }
 
     // Selection becomes a plain tint colour here. The Renderer only knows colours and matrices.
-    draws.clear(); // keeps its memory from last frame
+    std::vector<Renderer::MeshDraw> draws;
+    draws.reserve(library.items.size() + 1);
 
     // The detected planes first, as see-through rectangles: the pieces and the debug square are drawn over them.
     // Only while scanning: once the station is placed they would just cover it.
@@ -337,54 +232,21 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
 
     if (placed && stationShown)
     {
-        // Solid pieces first, then what is inside them (liquids, stream, grains), then see-through ones (the glass cup)
-        // last, so the coffee shows through the glass. A see-through piece drawn first would hide what is inside it.
-        for (int pass = 0; pass < 2; ++pass)
+        for (std::size_t i = 0; i < library.items.size() && i < meshes.size(); ++i)
         {
-            if (pass == 1)
-            {
-                DrawLiquidsAndEffects();
-            }
-            for (std::size_t i = 0; i < library.items.size() && i < meshes.size() && i < models.size(); ++i)
-            {
-                bool const seeThrough = library.items[i].alpha < 1.0f;
-                if (seeThrough != (pass == 1))
-                {
-                    continue;
-                }
-                Renderer::MeshDraw draw;
-                draw.meshIndex  = i;
-                draw.model      = models[i];
-                draw.color      = library.items[i].hasColour ? library.items[i].colour : ColorFor(i);
-                draw.alpha      = library.items[i].alpha;
-                draw.tint       = Vector3D{1.0f, 0.85f, 0.2f}; // yellow
-                draw.tintAmount = (selected && *selected == i && !animating) ? 0.45f : 0.0f;
-                draws.push_back(draw);
-            }
+            Renderer::MeshDraw draw;
+            draw.meshIndex  = i;
+            draw.model      = models[i];
+            draw.shader     = materials[i].shader; // from the data, via ObjLoader's box
+            draw.color      = materials[i].colour;
+            draw.tint       = Vector3D{1.0f, 0.85f, 0.2f}; // yellow
+            draw.tintAmount = (selected && *selected == i) ? 0.45f : 0.0f;
+            draws.push_back(draw);
         }
     }
 
-    // The lesson's pointer: a light-blue arrow bobbing just above the piece the current step needs (Mabel's design).
-    // Unlit and never hidden by depth, so it always reads clearly.
-    std::optional<std::size_t> const target = LessonTargetIndex();
-    if (placed && stationShown && target && !animating && meshes.size() > library.items.size() + 1)
-    {
-        Collider const box = library.items[*target].localBounds.Transformed(models[*target]);
-        float const    bob = 0.008f * std::sin(clock * 4.0f);
-        Renderer::MeshDraw arrow;
-        arrow.meshIndex  = library.items.size() + 1;
-        arrow.model      = Matrix4x4::Translate((box.minPoint.x + box.maxPoint.x) * 0.5f, box.maxPoint.y + 0.02f + bob,
-                                                (box.minPoint.z + box.maxPoint.z) * 0.5f);
-        arrow.tint       = Vector3D{0.56f, 0.74f, 0.90f}; // Mabel's light blue
-        arrow.tintAmount = 1.0f;                           // plain colour, no lighting
-        arrow.alpha      = 0.95f;
-        arrow.occludable = false;
-        draws.push_back(arrow);
-    }
-
     // The debug square: red = a plane the code won't use, yellow = a good plane (holding steady), green = the anchor.
-    // Hidden during a lesson: the design has no square, the arrow does that job.
-    if (markerState != 0 && lessonSteps.empty() && (!placed || stationShown) && meshes.size() > library.items.size())
+    if (markerState != 0 && (!placed || stationShown) && meshes.size() > library.items.size())
     {
         Renderer::MeshDraw marker;
         marker.meshIndex = library.items.size();
@@ -401,482 +263,6 @@ void EquipmentScene::Draw(Matrix4x4 const& view, Matrix4x4 const& projection)
         return;
     }
     Renderer::Get().DrawMeshes(draws, view, projection);
-}
-
-// A downward arrow, 4.5 cm tall: a 6-sided cone (the head, tip at the origin) under a thin square shaft.
-MeshData EquipmentScene::MakeArrowMesh()
-{
-    MeshData       arrow;
-    float const    headRadius = 0.012f;
-    float const    headHeight = 0.022f;
-    float const    shaftHalf  = 0.004f;
-    float const    shaftTop   = 0.045f;
-    int const      sides      = 6;
-    Vector3D const up{0.0f, 1.0f, 0.0f};
-
-    // Head: tip, then a ring of corners at headHeight. Normals are not used (the arrow is drawn unlit).
-    arrow.vertices.push_back(Vertex{Vector3D{0.0f, 0.0f, 0.0f}, up, Vector2D{}});
-    for (int i = 0; i < sides; ++i)
-    {
-        float const a = 6.2831853f * static_cast<float>(i) / static_cast<float>(sides);
-        arrow.vertices.push_back(
-            Vertex{Vector3D{headRadius * std::cos(a), headHeight, headRadius * std::sin(a)}, up, Vector2D{}});
-    }
-    for (int i = 0; i < sides; ++i)
-    {
-        std::uint32_t const a = static_cast<std::uint32_t>(1 + i);
-        std::uint32_t const b = static_cast<std::uint32_t>(1 + (i + 1) % sides);
-        arrow.indices.insert(arrow.indices.end(), {0u, a, b}); // side of the cone
-        if (i > 0 && i + 1 < sides)
-        {
-            arrow.indices.insert(arrow.indices.end(), {1u, b, a}); // cap on top of the head
-        }
-    }
-
-    // Shaft: a box from the top of the head up to shaftTop.
-    std::uint32_t const base = static_cast<std::uint32_t>(arrow.vertices.size());
-    for (float y : {headHeight, shaftTop})
-    {
-        for (Vector2D const c : {Vector2D{-shaftHalf, -shaftHalf}, Vector2D{shaftHalf, -shaftHalf},
-                                 Vector2D{shaftHalf, shaftHalf}, Vector2D{-shaftHalf, shaftHalf}})
-        {
-            arrow.vertices.push_back(Vertex{Vector3D{c.x, y, c.y}, up, Vector2D{}});
-        }
-    }
-    for (std::uint32_t i = 0; i < 4; ++i)
-    {
-        std::uint32_t const j = (i + 1) % 4;
-        arrow.indices.insert(arrow.indices.end(), {base + i, base + j, base + 4 + j, base + i, base + 4 + j, base + 4 + i});
-    }
-    arrow.indices.insert(arrow.indices.end(), {base + 4, base + 5, base + 6, base + 4, base + 6, base + 7}); // top
-    return arrow;
-}
-
-// ---- Animation (sandbox) ----------------------------------------------------------------------------------------------
-
-namespace
-{
-    Vector3D Scaled(Vector3D const& v, float f) { return Vector3D{v.x * f, v.y * f, v.z * f}; }
-    Vector3D Lerp(Vector3D const& a, Vector3D const& b, float t) { return a + Scaled(b - a, t); }
-    float    Clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
-    // 0 before a, 1 after b, an eased S-curve between: every move starts and stops gently.
-    float Phase(float p, float a, float b)
-    {
-        float const t = Clamp01((p - a) / (b - a));
-        return t * t * (3.0f - 2.0f * t);
-    }
-    // Tiny repeatable "random" in -1..1, so grains spread without needing a random number generator.
-    float Jitter(int n)
-    {
-        float const s = std::sin(static_cast<float>(n) * 12.9898f) * 43758.5453f;
-        return (s - std::floor(s)) * 2.0f - 1.0f;
-    }
-}
-
-// Unit cylinder: radius 1, y from 0 to 1, with both ends closed.
-MeshData EquipmentScene::MakeCylinderMesh()
-{
-    MeshData   cyl;
-    int const  sides = 16;
-    for (int ring = 0; ring < 2; ++ring)
-    {
-        for (int i = 0; i < sides; ++i)
-        {
-            float const a = 6.2831853f * static_cast<float>(i) / static_cast<float>(sides);
-            Vector3D const n{std::cos(a), 0.0f, std::sin(a)};
-            cyl.vertices.push_back(Vertex{Vector3D{n.x, static_cast<float>(ring), n.z}, n, Vector2D{}});
-        }
-    }
-    std::uint32_t const bottomCentre = static_cast<std::uint32_t>(cyl.vertices.size());
-    cyl.vertices.push_back(Vertex{Vector3D{0.0f, 0.0f, 0.0f}, Vector3D{0.0f, -1.0f, 0.0f}, Vector2D{}});
-    cyl.vertices.push_back(Vertex{Vector3D{0.0f, 1.0f, 0.0f}, Vector3D{0.0f, 1.0f, 0.0f}, Vector2D{}});
-    for (int i = 0; i < sides; ++i)
-    {
-        std::uint32_t const a = static_cast<std::uint32_t>(i);
-        std::uint32_t const b = static_cast<std::uint32_t>((i + 1) % sides);
-        std::uint32_t const s = static_cast<std::uint32_t>(sides);
-        cyl.indices.insert(cyl.indices.end(), {a, s + a, s + b, a, s + b, b});    // side
-        cyl.indices.insert(cyl.indices.end(), {bottomCentre, b, a});                // bottom
-        cyl.indices.insert(cyl.indices.end(), {bottomCentre + 1, s + a, s + b});    // top (the liquid's surface)
-    }
-    return cyl;
-}
-
-// A cube 1 unit wide, centred: scaled down to a few millimetres for grains and drips.
-MeshData EquipmentScene::MakeGrainMesh()
-{
-    MeshData grain;
-    for (int i = 0; i < 8; ++i)
-    {
-        Vector3D const p{(i & 1) ? 0.5f : -0.5f, (i & 2) ? 0.5f : -0.5f, (i & 4) ? 0.5f : -0.5f};
-        grain.vertices.push_back(Vertex{p, p.Normalize(), Vector2D{}});
-    }
-    grain.indices = {0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1,
-                     2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3};
-    return grain;
-}
-
-std::optional<std::size_t> EquipmentScene::PieceIndex(std::string const& id) const
-{
-    for (std::size_t i = 0; i < library.items.size(); ++i)
-    {
-        if (library.items[i].id == id)
-        {
-            return i;
-        }
-    }
-    return std::nullopt;
-}
-
-void EquipmentScene::ContainerInside(std::size_t i, float& radius, float& floor, float& height) const
-{
-    // The mesh's box, in piece-local metres (before its scale). A handle makes one side longer, so use the narrower
-    // side for the round inside, and assume the body is centred on the piece's origin (true for our models).
-    Collider const& box   = library.items[i].localBounds;
-    float const     halfX = (box.maxPoint.x - box.minPoint.x) * 0.5f;
-    float const     halfZ = (box.maxPoint.z - box.minPoint.z) * 0.5f;
-    radius = 0.82f * (halfX < halfZ ? halfX : halfZ);
-    floor  = box.minPoint.y + 0.006f;
-    height = 0.88f * (box.maxPoint.y - box.minPoint.y);
-}
-
-void EquipmentScene::UpdateAnimation(float dt)
-{
-    // Grain physics runs even between animations: grains still in the air keep falling and land.
-    float const gravity = 2.5f; // m/s^2. Slower than the real 9.8, so millimetre grains are visible on a phone
-    for (Grain& g : grains)
-    {
-        g.velocity.y -= gravity * dt;
-        g.position = g.position + Scaled(g.velocity, dt);
-    }
-    grains.erase(std::remove_if(grains.begin(), grains.end(), [](Grain const& g) { return g.position.y < g.floorY; }),
-                 grains.end());
-
-    streamOn = false;
-    if (!animating)
-    {
-        return;
-    }
-    if (lessonStep >= lessonSteps.size())
-    {
-        animating = false;
-        return;
-    }
-
-    LessonStep const&                step  = lessonSteps[lessonStep];
-    LessonAnimation const&           anim  = step.animation;
-    std::optional<std::size_t> const piece = PieceIndex(anim.piece.empty() ? step.target : anim.piece);
-    std::optional<std::size_t> const into  = PieceIndex(anim.into);
-    if (!piece)
-    {
-        FinishAnimation();
-        return;
-    }
-
-    animTime += dt;
-    float const       p    = Clamp01(animTime / (anim.seconds > 0.1f ? anim.seconds : 0.1f));
-    std::size_t const s    = *piece;
-    Vector3D const    home = basePositions[s];
-
-    // Where it works: over 'into', coming in from its own side. (dx, dz) points from 'into' back toward the piece.
-    Vector3D const target  = into ? basePositions[*into] : home;
-    float const    intoTop = into ? library.items[*into].localBounds.maxPoint.y * library.items[*into].scale : 0.0f;
-    float          dx      = home.x - target.x;
-    float          dz      = home.z - target.z;
-    float const    length  = std::sqrt(dx * dx + dz * dz);
-    if (length < 0.0001f)
-    {
-        dx = 1.0f;
-        dz = 0.0f;
-    }
-    else
-    {
-        dx /= length;
-        dz /= length;
-    }
-    // RotateY(a) turns +x to (cos a, 0, -sin a); the piece's +x must face 'into', i.e. (-dx, -dz).
-    float const faceInto = std::atan2(dz, -dx) * 57.2958f;
-
-    float      intoRadius = 0.0f;
-    float      intoFloor  = 0.0f;
-    float      intoHeight = 0.0f;
-    if (into)
-    {
-        ContainerInside(*into, intoRadius, intoFloor, intoHeight);
-    }
-    Vector3D pos  = home;
-    float    tilt = 0.0f;
-    float    turn = 0.0f;
-
-    if (anim.type == "Pour" || anim.type == "Sprinkle")
-    {
-        // Pour: the spout end (+x) reaches over the middle of 'into'. Sprinkle: the open end hangs right above it.
-        float const reach = (anim.type == "Pour") ? library.items[s].localBounds.maxPoint.x * library.items[s].scale * 0.8f
-                                                  : 0.02f;
-        Vector3D const hover = target + Vector3D{dx * reach, intoTop + 0.04f, dz * reach};
-        float const    go    = Phase(p, 0.0f, 0.2f);
-        float const    back  = Phase(p, 0.85f, 1.0f);
-        pos  = Lerp(Lerp(home, hover, go), home, back);
-        pos.y += 0.03f * std::sin(3.14159f * go) * (1.0f - back); // a small lift on the way over
-        tilt = anim.tilt * Phase(p, 0.2f, 0.35f) * (1.0f - Phase(p, 0.7f, 0.85f));
-        turn = faceInto * (go < 1.0f - back ? go : 1.0f - back);
-
-        if (anim.type == "Pour")
-        {
-            // While tipped: a stream runs, 'into' fills and takes on the poured colour, a pouring pot empties.
-            float const f = Phase(p, 0.33f, 0.72f);
-            streamOn      = tilt > anim.tilt * 0.6f;
-            streamColour  = anim.colour;
-            if (into)
-            {
-                float const added = anim.level - animStartInto.level;
-                float const now   = animStartInto.level + added * f;
-                liquids[*into].level  = now;
-                liquids[*into].colour = (now > 0.0001f)
-                                            ? Scaled(Scaled(animStartInto.colour, animStartInto.level) + Scaled(anim.colour, added * f), 1.0f / now)
-                                            : anim.colour;
-            }
-            if (animStartPiece.level > 0.0f)
-            {
-                liquids[s].level = animStartPiece.level * (1.0f - 0.7f * f);
-            }
-        }
-        else
-        {
-            // Sprinkle: grains leave the open end (the top of the piece, now tipped over) and fall with gravity.
-            if (p > 0.32f && p < 0.72f)
-            {
-                RefreshModels(); // the tipped pose for this frame, to find where the opening is
-                Collider const& box   = library.items[s].localBounds;
-                Vector3D const  mouth = models[s].TransformPoint(Vector3D{0.0f, box.maxPoint.y, 0.0f});
-                float const     landY = into ? models[*into].TransformPoint(Vector3D{0.0f, intoFloor + intoHeight * liquids[*into].level, 0.0f}).y
-                                             : mouth.y - 0.1f;
-                grainSpawn += dt * 70.0f; // grains per second
-                while (grainSpawn >= 1.0f && grains.size() < 200)
-                {
-                    grainSpawn -= 1.0f;
-                    int const n = static_cast<int>(grains.size()) + static_cast<int>(animTime * 1000.0f);
-                    grains.push_back(Grain{mouth + Vector3D{Jitter(n) * 0.006f, 0.0f, Jitter(n + 7) * 0.006f},
-                                           Vector3D{Jitter(n + 3) * 0.04f, -0.05f, Jitter(n + 5) * 0.04f}, anim.colour,
-                                           landY});
-                }
-            }
-        }
-    }
-    else if (anim.type == "Dip")
-    {
-        // Over the pot, down inside it, brew (the pot's liquid turns 'colour'), up again dripping, then home.
-        Vector3D const hover  = target + Vector3D{0.0f, intoTop + 0.03f, 0.0f};
-        Vector3D const dipped = target + Vector3D{0.0f, intoFloor + 0.004f, 0.0f};
-        float const    go     = Phase(p, 0.0f, 0.2f);
-        float const    down   = Phase(p, 0.2f, 0.35f);
-        float const    up     = Phase(p, 0.65f, 0.8f);
-        float const    back   = Phase(p, 0.8f, 1.0f);
-        pos = Lerp(Lerp(Lerp(Lerp(home, hover, go), dipped, down), hover, up), home, back);
-        if (into)
-        {
-            liquids[*into].colour = Lerp(animStartInto.colour, anim.colour, Phase(p, 0.35f, 0.65f));
-        }
-        if (p > 0.66f && p < 0.86f && into)
-        {
-            RefreshModels();
-            Vector3D const bottom = models[s].TransformPoint(Vector3D{0.0f, 0.0f, 0.0f});
-            float const    landY  = models[*into].TransformPoint(Vector3D{0.0f, intoFloor + intoHeight * liquids[*into].level, 0.0f}).y;
-            grainSpawn += dt * 18.0f; // drips per second
-            while (grainSpawn >= 1.0f && grains.size() < 200)
-            {
-                grainSpawn -= 1.0f;
-                int const n = static_cast<int>(animTime * 1000.0f);
-                grains.push_back(Grain{bottom + Vector3D{Jitter(n) * 0.02f, 0.0f, Jitter(n + 9) * 0.02f},
-                                       Vector3D{0.0f, -0.02f, 0.0f}, anim.colour, landY});
-            }
-        }
-    }
-    else if (anim.type == "Place")
-    {
-        pos = Lerp(home, anim.to, Phase(p, 0.0f, 1.0f));
-        pos.y += 0.04f * std::sin(3.14159f * p);
-    }
-    else if (anim.type == "Stir")
-    {
-        // The spoon turns upright (handle up, bowl down), goes into the cup, circles three times, comes back.
-        float const    stand  = Phase(p, 0.0f, 0.2f) * (1.0f - Phase(p, 0.88f, 1.0f));
-        Vector3D const hover  = target + Vector3D{0.0f, intoTop + 0.03f, 0.0f};
-        Vector3D const inside = target + Vector3D{0.0f, intoFloor + 0.006f, 0.0f};
-        float const    go     = Phase(p, 0.0f, 0.2f);
-        float const    down   = Phase(p, 0.2f, 0.3f);
-        float const    up     = Phase(p, 0.8f, 0.88f);
-        float const    back   = Phase(p, 0.88f, 1.0f);
-        pos = Lerp(Lerp(Lerp(Lerp(home, hover, go), inside, down), hover, up), home, back);
-        if (p > 0.3f && p < 0.8f)
-        {
-            float const a = (p - 0.3f) / 0.5f * 3.0f * 6.2831853f;
-            pos = pos + Vector3D{0.4f * intoRadius * std::cos(a), 0.0f, 0.4f * intoRadius * std::sin(a)};
-        }
-        tilt = -90.0f * stand; // tipping by -90 stands the handle (+x) straight up
-        if (into)
-        {
-            liquids[*into].colour = Lerp(animStartInto.colour, anim.colour, Phase(p, 0.3f, 0.8f));
-        }
-    }
-
-    animOffset[s] = pos - home;
-    animTilt[s]   = tilt;
-    animTurn[s]   = turn;
-
-    if (p >= 1.0f)
-    {
-        FinishAnimation();
-    }
-}
-
-void EquipmentScene::FinishAnimation()
-{
-    if (lessonStep < lessonSteps.size())
-    {
-        LessonStep const&                step  = lessonSteps[lessonStep];
-        LessonAnimation const&           anim  = step.animation;
-        std::optional<std::size_t> const piece = PieceIndex(anim.piece.empty() ? step.target : anim.piece);
-        if (piece)
-        {
-            animOffset[*piece] = Vector3D{0.0f, 0.0f, 0.0f};
-            animTilt[*piece]   = 0.0f;
-            animTurn[*piece]   = 0.0f;
-            if (anim.type == "Place")
-            {
-                basePositions[*piece] = anim.to; // it stays where it was put
-            }
-        }
-        ++lessonStep;
-        LOGI("Lesson: step %zu of %zu done", lessonStep, lessonSteps.size());
-    }
-    animating = false;
-    streamOn  = false;
-}
-
-void EquipmentScene::DrawLiquidsAndEffects()
-{
-    std::size_t const cylinder = library.items.size() + 2;
-    std::size_t const grainMesh = library.items.size() + 3;
-    if (meshes.size() <= grainMesh)
-    {
-        return;
-    }
-
-    // Liquids: a cylinder inside each container, as tall as its level, in its colour. It follows the container's
-    // model matrix, so it moves and tips with a pot that is pouring.
-    for (std::size_t i = 0; i < liquids.size() && i < models.size(); ++i)
-    {
-        if (liquids[i].level <= 0.002f)
-        {
-            continue;
-        }
-        float radius = 0.0f;
-        float floor  = 0.0f;
-        float height = 0.0f;
-        ContainerInside(i, radius, floor, height);
-        Renderer::MeshDraw liquid;
-        liquid.meshIndex = cylinder;
-        liquid.model     = Matrix4x4::Scale(radius, height * liquids[i].level, radius) *
-                       Matrix4x4::Translate(0.0f, floor, 0.0f) * models[i];
-        liquid.color = liquids[i].colour;
-        liquid.alpha = 0.92f;
-        draws.push_back(liquid);
-    }
-
-    // The pour stream: a thin cylinder from the spout to the liquid's surface.
-    if (streamOn && animating && lessonStep < lessonSteps.size())
-    {
-        LessonStep const&                step  = lessonSteps[lessonStep];
-        std::optional<std::size_t> const piece = PieceIndex(step.animation.piece.empty() ? step.target : step.animation.piece);
-        std::optional<std::size_t> const into  = PieceIndex(step.animation.into);
-        if (piece && into && *piece < models.size() && *into < models.size())
-        {
-            Collider const& box = library.items[*piece].localBounds;
-            float radius = 0.0f;
-            float floor  = 0.0f;
-            float height = 0.0f;
-            ContainerInside(*into, radius, floor, height);
-            Vector3D const top    = models[*piece].TransformPoint(Vector3D{box.maxPoint.x * 0.97f, box.maxPoint.y * 0.9f, 0.0f});
-            Vector3D const bottom = models[*into].TransformPoint(Vector3D{0.0f, floor + height * liquids[*into].level, 0.0f});
-            Vector3D const axis   = bottom - top;
-            Vector3D side         = axis.CrossProduct(Vector3D{0.0f, 0.0f, 1.0f});
-            if (side.Magnitude() < 0.0001f)
-            {
-                side = axis.CrossProduct(Vector3D{1.0f, 0.0f, 0.0f});
-            }
-            float const    thickness = 0.0025f;
-            Vector3D const x         = Scaled(side.Normalize(), thickness);
-            Vector3D const z         = Scaled(axis.CrossProduct(side).Normalize(), thickness);
-            // Row vectors: the mesh's x, y, z axes become these rows, and its origin goes to 'top'. y runs 0..1 along the
-            // whole stream, so y = 1 lands exactly on 'bottom'.
-            Matrix4x4 stream;
-            stream.m[0][0] = x.x;    stream.m[0][1] = x.y;    stream.m[0][2] = x.z;    stream.m[0][3] = 0.0f;
-            stream.m[1][0] = axis.x; stream.m[1][1] = axis.y; stream.m[1][2] = axis.z; stream.m[1][3] = 0.0f;
-            stream.m[2][0] = z.x;    stream.m[2][1] = z.y;    stream.m[2][2] = z.z;    stream.m[2][3] = 0.0f;
-            stream.m[3][0] = top.x;  stream.m[3][1] = top.y;  stream.m[3][2] = top.z;  stream.m[3][3] = 1.0f;
-            Renderer::MeshDraw draw;
-            draw.meshIndex = cylinder;
-            draw.model     = stream;
-            draw.color     = streamColour;
-            draw.alpha     = 0.85f;
-            draws.push_back(draw);
-        }
-    }
-
-    // Grains and drips: tiny cubes, 3 mm.
-    for (Grain const& g : grains)
-    {
-        Renderer::MeshDraw grain;
-        grain.meshIndex = grainMesh;
-        grain.model     = Matrix4x4::Scale(0.003f, 0.003f, 0.003f) * Matrix4x4::Translate(g.position.x, g.position.y, g.position.z);
-        grain.color     = g.colour;
-        draws.push_back(grain);
-    }
-}
-
-void EquipmentScene::LoadLesson(std::string name, std::string mode, std::vector<LessonStep> steps)
-{
-    lessonName  = std::move(name);
-    lessonMode  = std::move(mode);
-    lessonSteps = std::move(steps);
-    lessonStep  = 0;
-    LOGI("Lesson '%s' loaded: %zu steps", lessonName.c_str(), lessonSteps.size());
-}
-
-std::optional<std::size_t> EquipmentScene::LessonTargetIndex() const
-{
-    if (lessonStep >= lessonSteps.size())
-    {
-        return std::nullopt;
-    }
-    for (std::size_t i = 0; i < library.items.size() && i < models.size(); ++i)
-    {
-        if (library.items[i].id == lessonSteps[lessonStep].target)
-        {
-            return i;
-        }
-    }
-    return std::nullopt; // the step names a piece that is not in the scene
-}
-
-std::string EquipmentScene::LessonState() const
-{
-    char const  sep   = 9; // tab: the HUD splits on it, and no lesson text contains one
-    bool const  done  = !lessonSteps.empty() && lessonStep >= lessonSteps.size();
-    std::string state = (!placed || !stationShown) ? "scan" : (done ? "done" : "step");
-    LessonStep const empty{};
-    LessonStep const& step = (lessonStep < lessonSteps.size()) ? lessonSteps[lessonStep] : empty;
-    bool const wrong = (clock - wrongTapAt) < 1.5f;
-
-    std::string out = state;
-    for (std::string const& field : {std::to_string(lessonStep + 1), std::to_string(lessonSteps.size()), step.section,
-                                     step.title, step.hint, lessonName, lessonMode, std::string(wrong ? "1" : "0")})
-    {
-        out += sep;
-        out += field;
-    }
-    return out;
 }
 
 void EquipmentScene::DrawLoader(float seconds, int viewportW, int viewportH)
@@ -897,7 +283,8 @@ void EquipmentScene::DrawLoader(float seconds, int viewportW, int viewportH)
     float const head        = std::fmod(seconds * stepsPerSec, static_cast<float>(dots));
     float const degToRad    = 3.14159265f / 180.0f;
 
-    draws.clear();
+    std::vector<Renderer::MeshDraw> draws;
+    draws.reserve(dots);
     for (int i = 0; i < dots; ++i)
     {
         float const angle = 90.0f - 360.0f * i / dots; // clockwise from the top

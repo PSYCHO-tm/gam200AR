@@ -124,7 +124,6 @@ void Shader::Destroy()
     }
     program = 0;
     locations.clear();
-    fastLocations.clear();
 }
 
 // The context died with the program in it: just forget the handle, never call glDeleteProgram on it.
@@ -132,7 +131,6 @@ void Shader::ContextLost()
 {
     program = 0;
     locations.clear();
-    fastLocations.clear();
 }
 
 void Shader::Use() const { glUseProgram(program); }
@@ -142,14 +140,6 @@ bool Shader::IsValid() const { return program != 0; }
 // Asking GL for a uniform's location by name is slow, so each name is looked up once and remembered.
 GLint Shader::Location(const char* name)
 {
-    for (FastLocation const& fast : fastLocations)
-    {
-        if (fast.name == name)
-        {
-            return fast.location; // same literal as last time: no string built, no hashing
-        }
-    }
-
     const auto it = locations.find(name);
     if (it != locations.end())
     {
@@ -162,7 +152,6 @@ GLint Shader::Location(const char* name)
         LOGE("Uniform '%s' not found (misspelled, or unused so the compiler removed it)", name);
     }
     locations.emplace(name, loc);
-    fastLocations.push_back({name, loc});
     return loc;
 }
 

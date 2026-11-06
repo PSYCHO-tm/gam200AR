@@ -1,5 +1,6 @@
 #include "RegisterComponents.hpp"
 #include "sharedlib.hpp"
+#include "objLoader.hpp" // ShaderKindFromName, so the shader names checked here are the ones the renderer knows
 #include <set>
 
 namespace Ecs{
@@ -84,6 +85,15 @@ namespace Ecs{
             for (auto const& v : values)
                 if (!seen.insert(v).second) here.Fail("'" + v + "' is listed twice");
         }
+    }
+
+    // MeshRef: a model file is named, the shader exists, and the colour is a real colour (each part 0..1)
+    void Rules<::MeshRef>::Check(::MeshRef const& m, ValidationS const& ctx)
+    {
+        if (m.Path.empty()) ctx.At("Path").Fail("must name the .obj file");
+        if (!ShaderKindFromName(m.Shader)) ctx.At("Shader").Fail("unknown shader '" + m.Shader + "' (known: Lit)");
+        for (float const c : {m.Colour.x, m.Colour.y, m.Colour.z})
+            if (c < 0.0f || c > 1.0f) { ctx.At("Colour").Fail("each value must be between 0 and 1"); break; }
     }
 
     /*

@@ -54,8 +54,17 @@ struct Result   {
     std::string Grade;
 };
 
-struct MeshRef { 
-    std::string Path; 
+/*
+    Which model a piece uses, and how it is drawn (M2: the Render-System's {Shader, Colour} box comes from here).
+    Path   = the .obj file, repo-relative (required)
+    Shader = which shader draws it: "Lit" for now (optional, default "Lit")
+    Colour = its base colour, [r, g, b] each 0..1 (optional, default light grey)
+    Shader and Colour are optional so older JSON with only a Path still loads.
+*/
+struct MeshRef {
+    std::string Path;
+    std::string Shader = "Lit";
+    Vector3D    Colour{0.8f, 0.8f, 0.8f};
 };
 
 
@@ -90,6 +99,11 @@ namespace Ecs{
     struct Rules<::Attributes>{
         static void Check(::Attributes const& a, ValidationS const& ctx);
     };
+
+    template <>
+    struct Rules<::MeshRef>{
+        static void Check(::MeshRef const& m, ValidationS const& ctx);
+    };
 }
  
 inline void to_json(Ecs::Json& j, Vector3D const& v)   { j = Ecs::Json::array({v.x, v.y, v.z}); }
@@ -104,12 +118,12 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Units, Value)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RecipeRef, Id)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Temp, Status)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DefRef, Kind, Id, Overrides)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MeshRef, Path)
 
 //This macro allows the listed fields to be optional in the JSON
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Attributes, Allowed)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Contents, Items)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Result, Score, Grade)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MeshRef, Path, Shader, Colour) // Path is still required: Rules<MeshRef> checks it
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Transform3D, scale, rotation, position) //del if unused
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Transform2D, scale, rotation, position) //del if unused
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Raycast, origin, direction) //del if unused
